@@ -64,6 +64,7 @@ export type DomainEvent =
   | { type: 'ContractVerificationRecorded'; proposalId: ChangeProposalId }
   | { type: 'DeploymentRecorded'; proposalId: ChangeProposalId }
   | { type: 'ObservationRecorded'; proposalId: ChangeProposalId }
+  | { type: 'ConsumerMigrationCompleted'; proposalId: ChangeProposalId }
   | { type: 'ChangeProposalCompleted'; proposalId: ChangeProposalId }
   | { type: 'ChangeProposalRejected'; proposalId: ChangeProposalId }
   | { type: 'ChangeProposalWithdrawn'; proposalId: ChangeProposalId }
@@ -117,6 +118,7 @@ export function aggregateOf(event: DomainEvent): { type: AggregateType; id: stri
     case 'DeploymentRecorded':
     case 'ObservationRecorded':
     case 'ChangeProposalCompleted':
+    case 'ConsumerMigrationCompleted':
     case 'ChangeProposalRejected':
     case 'ChangeProposalWithdrawn':
     case 'BlockingObjectionRaised':

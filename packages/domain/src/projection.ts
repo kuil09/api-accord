@@ -65,6 +65,9 @@ export function changeProposalState(
       case 'ObservationRecorded':
         observed = true;
         break;
+      case 'ConsumerMigrationCompleted':
+        consumerMigrationComplete = true;
+        break;
       case 'ChangeProposalCompleted':
         outcome = 'completed';
         phase = 'closed';
