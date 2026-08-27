@@ -4,8 +4,8 @@
 // past — the original events remain and the derived state simply points at the
 // newer item.
 
-import type { ChangeProposalState, ContextItem } from './model.js';
-import type { ChangeProposalId, ContextItemId } from './primitives.js';
+import type { ChangeProposalState, ContextItem, DependencyAssumption, DependencyEdge } from './model.js';
+import type { ChangeProposalId, ContextItemId, DependencyEdgeId } from './primitives.js';
 import type { DomainEvent, EventEnvelope } from './events.js';
 
 // Returns events whose occurrence is at or before `when`, enabling reconstruction
@@ -148,4 +148,95 @@ export function contextItemFrom(
   }
 
   return item;
+}
+
+// Reconstructs a DependencyEdge from its event stream (issue #6). Assumptions
+// from different consumers/sources are preserved rather than averaged; when two
+// assumptions on the same edge contradict, both stay visible as `conflicting`.
+export function dependencyEdgeFrom(
+  events: ReadonlyArray<EventEnvelope<DomainEvent>>,
+  edgeId: DependencyEdgeId
+): DependencyEdge | undefined {
+  const stream = events
+    .filter((envelope) => envelope.aggregateType === 'dependencyEdge' && envelope.aggregateId === edgeId)
+    .sort((left, right) => left.version - right.version);
+
+  let edge: DependencyEdge | undefined;
+  const assumptions = new Map<string, DependencyAssumption>();
+
+  for (const envelope of stream) {
+    const event = envelope.event;
+    if (event.type === 'DependencyEdgeDeclared') {
+      edge = {
+        id: edgeId,
+        consumerServiceId: event.consumerServiceId,
+        operationId: event.operationId,
+        usage: event.usage,
+        assumptions: [],
+        compatibility: event.compatibility,
+        criticality: event.criticality,
+        ownerTeamId: event.ownerTeamId,
+        source: event.source,
+        confirmedAt: envelope.occurredAt,
+        deprecated: false
+      };
+    } else if (event.type === 'DependencyAssumptionAdded' && edge !== undefined) {
+      assumptions.set(event.assumptionId, {
+        id: event.assumptionId,
+        statement: event.statement,
+        source: event.source,
+        confidence: event.confidence,
+        conflictStatus: event.conflictStatus
+      });
+      edge = { ...edge, assumptions: [...assumptions.values()] };
+    } else if (event.type === 'DependencyEdgeDeprecated' && edge !== undefined) {
+      edge = { ...edge, deprecated: true };
+    }
+  }
+
+  return edge;
+}
+
+// Detects conflicting assumptions on the same operation (INV-008: never average
+// or overwrite opposing consumer assumptions). Returns the conflicting pair ids.
+export function findConflictingAssumptions(
+  edges: ReadonlyArray<DependencyEdge>
+): ReadonlyArray<readonly [DependencyEdgeId, string, DependencyEdgeId, string]> {
+  const conflicts: Array<readonly [DependencyEdgeId, string, DependencyEdgeId, string]> = [];
+  for (let i = 0; i < edges.length; i += 1) {
+    for (let j = i + 1; j < edges.length; j += 1) {
+      const a = edges[i];
+      const b = edges[j];
+      if (a === undefined || b === undefined) {
+        continue;
+      }
+      if (a.operationId !== b.operationId) {
+        continue;
+      }
+      for (const assumptionA of a.assumptions) {
+        for (const assumptionB of b.assumptions) {
+          if (assumptionA.statement !== assumptionB.statement && contradicts(assumptionA.statement, assumptionB.statement)) {
+            conflicts.push([a.id, assumptionA.id, b.id, assumptionB.id]);
+          }
+        }
+      }
+    }
+  }
+  return conflicts;
+}
+
+// A simple keyword-based contradiction check; real semantic conflict detection
+// is later (#18). This keeps opposing assumptions visible rather than merged.
+function contradicts(statementA: string, statementB: string): boolean {
+  const normalizedA = statementA.toLowerCase();
+  const normalizedB = statementB.toLowerCase();
+  const polarity = (text: string): 1 | -1 | 0 => {
+    if (/(always|must|exists|is)/u.test(text) && /not/u.test(text)) return -1;
+    if (/(always|must|exists|is)/u.test(text)) return 1;
+    return 0;
+  };
+  const pa = polarity(normalizedA);
+  const pb = polarity(normalizedB);
+  if (pa === 0 || pb === 0) return false;
+  return pa + pb === 0;
 }
