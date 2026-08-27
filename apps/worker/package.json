@@ -1,0 +1,13 @@
+{
+  "name": "@api-accord/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "dependencies": {
+    "@api-accord/config": "0.0.0",
+    "@api-accord/contracts": "0.0.0",
+    "@api-accord/domain": "0.0.0",
+    "pg": "^8.16.3"
+  }
+}

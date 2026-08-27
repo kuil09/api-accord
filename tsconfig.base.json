@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022", "DOM"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "composite": true,
+    "resolveJsonModule": true,
+    "typeRoots": ["./types"],
+    "baseUrl": ".",
+    "paths": {
+      "@api-accord/config": ["packages/config/src/index.ts"],
+      "@api-accord/contracts": ["packages/contracts/src/index.ts"],
+      "@api-accord/domain": ["packages/domain/src/index.ts"],
+      "@api-accord/mcp": ["packages/mcp/src/index.ts"]
+    }
+  }
+}
