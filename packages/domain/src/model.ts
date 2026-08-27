@@ -13,6 +13,7 @@ import type {
   ContextItemId,
   ContextScope,
   ContractVersionId,
+  CredentialId,
   DependencyEdgeId,
   DeploymentId,
   DiscussionEntryId,
@@ -23,8 +24,10 @@ import type {
   OperationId,
   OrganizationId,
   PrincipalId,
+  PrincipalKind,
   PrincipalRef,
   SchemaId,
+  Scope,
   ServiceId,
   TeamId,
   DecisionRecordId
@@ -168,6 +171,36 @@ export interface Observation {
   readonly environment: string;
   readonly observedAt: Date;
   readonly sampleSize: number;
+}
+
+// A participant in the system. Never anonymous; every mutation is attributed to
+// one of these (INV-026, INV-028).
+export interface Principal {
+  readonly id: PrincipalId;
+  readonly kind: PrincipalKind;
+  readonly organizationId: OrganizationId;
+  readonly name: string;
+  readonly status: 'active' | 'inactive';
+  readonly createdBy: PrincipalRef;
+  readonly createdAt: Date;
+}
+
+// MCP credential. The plaintext secret is exposed exactly once at issuance and
+// never stored; only the salted hash is persisted (INV-031).
+export interface Credential {
+  readonly id: CredentialId;
+  readonly principalId: PrincipalId;
+  readonly name: string;
+  readonly scopes: ReadonlyArray<Scope>;
+  readonly secretHash: string;
+  readonly issuedBy: PrincipalRef;
+  readonly issuedAt: Date;
+  readonly expiresAt: Date | undefined;
+  readonly lastUsedAt: Date | undefined;
+  readonly lastUsedIp: string | undefined;
+  readonly lastUsedClient: string | undefined;
+  readonly revokedAt: Date | undefined;
+  readonly rotatedFrom: CredentialId | undefined;
 }
 
 export type { PrincipalId };

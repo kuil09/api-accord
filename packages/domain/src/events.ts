@@ -15,6 +15,7 @@ import type {
   ContextItemId,
   ContextScope,
   ContractVersionId,
+  CredentialId,
   DecisionRecordId,
   DependencyEdgeId,
   DiscussionEntryId,
@@ -23,7 +24,10 @@ import type {
   EvidenceStatus,
   ObservationId,
   OperationId,
+  PrincipalId,
+  PrincipalKind,
   PrincipalRef,
+  Scope,
   ServiceId,
   TeamId,
   OrganizationId
@@ -44,7 +48,9 @@ export type AggregateType =
   | 'decisionRecord'
   | 'evidence'
   | 'deployment'
-  | 'observation';
+  | 'observation'
+  | 'principal'
+  | 'credential';
 
 // The union of every domain event. Each event describes a single fact.
 export type DomainEvent =
@@ -73,7 +79,14 @@ export type DomainEvent =
   | { type: 'DecisionRecorded'; decisionRecordId: DecisionRecordId; proposalId: ChangeProposalId; decision: string; rationale: string; approvers: ReadonlyArray<PrincipalRef> }
   | { type: 'DecisionSuperseded'; originalDecisionRecordId: DecisionRecordId; supersedingDecisionRecordId: DecisionRecordId }
   | { type: 'EvidenceAttached'; evidenceId: EvidenceId; contractVersionId: ContractVersionId; sourceRevision: string; status: EvidenceStatus }
-  | { type: 'DriftDetected'; observationId: ObservationId; operationId: OperationId; environment: string; kind: string; severity: DriftSeverity; sampleSize: number };
+  | { type: 'DriftDetected'; observationId: ObservationId; operationId: OperationId; environment: string; kind: string; severity: DriftSeverity; sampleSize: number }
+  | { type: 'PrincipalRegistered'; principalId: PrincipalId; kind: PrincipalKind; organizationId: OrganizationId; name: string; createdBy: PrincipalRef; status: 'active' | 'inactive' }
+  | { type: 'PrincipalDeactivated'; principalId: PrincipalId; reason: string }
+  | { type: 'CredentialIssued'; credentialId: CredentialId; principalId: PrincipalId; name: string; scopes: ReadonlyArray<Scope>; expiresAt: Date | undefined; issuedBy: PrincipalRef; secretHash: string }
+  | { type: 'CredentialRevoked'; credentialId: CredentialId; revokedBy: PrincipalRef; reason: string }
+  | { type: 'CredentialRotated'; credentialId: CredentialId; rotatedBy: PrincipalRef; secretHash: string; supersededCredentialId: CredentialId | undefined }
+  | { type: 'ScopeGranted'; principalId: PrincipalId; scope: Scope; grantedBy: PrincipalRef }
+  | { type: 'ScopeRevoked'; principalId: PrincipalId; scope: Scope; revokedBy: PrincipalRef };
 
 export interface EventEnvelope<E extends DomainEvent = DomainEvent> {
   readonly eventId: string;
@@ -132,6 +145,15 @@ export function aggregateOf(event: DomainEvent): { type: AggregateType; id: stri
       return { type: 'evidence', id: event.evidenceId };
     case 'DriftDetected':
       return { type: 'observation', id: event.observationId };
+    case 'PrincipalRegistered':
+    case 'PrincipalDeactivated':
+    case 'ScopeGranted':
+    case 'ScopeRevoked':
+      return { type: 'principal', id: event.principalId };
+    case 'CredentialIssued':
+    case 'CredentialRevoked':
+    case 'CredentialRotated':
+      return { type: 'credential', id: event.credentialId };
   }
 }
 
