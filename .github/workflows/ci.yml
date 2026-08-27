@@ -1,0 +1,46 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: api_accord
+          POSTGRES_USER: api_accord
+          POSTGRES_PASSWORD: api_accord
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U api_accord -d api_accord"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://api_accord:api_accord@localhost:5432/api_accord
+      LOG_LEVEL: warn
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm run test
+      - run: npm run db:validate
+      - run: npm run db:migrate
+      - run: npm run db:rollback
+      - run: npm run db:migrate
+      - run: npm run smoke

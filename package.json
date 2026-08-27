@@ -1,0 +1,40 @@
+{
+  "name": "api-accord",
+  "version": "0.0.0",
+  "private": true,
+  "description": "An API-centered collaboration system for contracts, context, decisions, implementation evidence, and drift correction.",
+  "type": "module",
+  "packageManager": "npm@10.9.2",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "bootstrap": "node scripts/bootstrap.mjs",
+    "build": "tsc -b",
+    "check": "npm run lint && npm run typecheck && npm run build && npm run test && npm run db:validate",
+    "clean": "node scripts/clean.mjs",
+    "db:migrate": "node scripts/migrate.mjs up",
+    "db:rollback": "node scripts/migrate.mjs down",
+    "db:validate": "node scripts/validate-migrations.mjs",
+    "dev": "node scripts/dev.mjs",
+    "dev:infra": "docker compose -f infra/docker-compose.yml up -d --wait postgres",
+    "dev:infra:down": "docker compose -f infra/docker-compose.yml down",
+    "lint": "node scripts/lint.mjs",
+    "smoke": "node scripts/smoke.mjs",
+    "start:api": "node apps/api/dist/index.js",
+    "start:web": "node apps/web/dist/index.js",
+    "start:worker": "node apps/worker/dist/index.js",
+    "test": "node scripts/test.mjs",
+    "typecheck": "tsc -p tsconfig.typecheck.json --pretty false"
+  },
+  "dependencies": {
+    "pg": "8.16.3"
+  },
+  "devDependencies": {
+    "typescript": "5.8.3"
+  }
+}
