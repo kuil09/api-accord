@@ -1,0 +1,16 @@
+DROP TABLE IF EXISTS observations;
+DROP TABLE IF EXISTS deployments;
+DROP TABLE IF EXISTS evidence;
+DROP TABLE IF EXISTS decision_records;
+DROP TABLE IF EXISTS change_proposals;
+DROP TABLE IF EXISTS discussion_entries;
+DROP TABLE IF EXISTS context_items;
+DROP TABLE IF EXISTS dependency_edges;
+DROP TABLE IF EXISTS schemas;
+DROP TABLE IF EXISTS operations;
+DROP TABLE IF EXISTS contract_versions;
+DROP TABLE IF EXISTS api_contracts;
+DROP TABLE IF EXISTS services;
+DROP TABLE IF EXISTS teams;
+DROP TABLE IF EXISTS organizations;
+DROP TABLE IF EXISTS domain_event;
