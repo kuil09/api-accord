@@ -51,6 +51,8 @@ export interface Service {
   readonly owningTeamId: TeamId;
   readonly name: string;
   readonly kind: 'provider' | 'consumer' | 'both';
+  readonly repositoryUrl?: string;
+  readonly environments: ReadonlyArray<string>;
 }
 
 export interface ApiContract {
@@ -58,6 +60,10 @@ export interface ApiContract {
   readonly organizationId: OrganizationId;
   readonly providerServiceId: ServiceId;
   readonly title: string;
+  // Import provenance: where the spec came from and when (INV-011 provenance).
+  readonly importSource: string;
+  readonly importSourceUrl?: string;
+  readonly importedAt: Date;
 }
 
 export interface ContractVersion {
@@ -72,6 +78,9 @@ export interface ContractVersion {
 
 export interface Operation {
   readonly id: OperationId;
+  // Stable identifier within the contract for specs lacking/duplicating operationId;
+  // defaults to METHOD:/path normalized form.
+  readonly opId: string;
   readonly contractId: ApiContractId;
   readonly method: string;
   readonly path: string;
