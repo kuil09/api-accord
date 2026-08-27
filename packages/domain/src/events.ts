@@ -26,6 +26,7 @@ import type {
   OperationId,
   PrincipalId,
   PrincipalKind,
+  SchemaId,
   PrincipalRef,
   Scope,
   ServiceId,
@@ -50,7 +51,12 @@ export type AggregateType =
   | 'deployment'
   | 'observation'
   | 'principal'
-  | 'credential';
+  | 'credential'
+  | 'service'
+  | 'apiContract'
+  | 'contractVersion'
+  | 'operation'
+  | 'schema';
 
 // The union of every domain event. Each event describes a single fact.
 export type DomainEvent =
@@ -86,7 +92,13 @@ export type DomainEvent =
   | { type: 'CredentialRevoked'; credentialId: CredentialId; revokedBy: PrincipalRef; reason: string }
   | { type: 'CredentialRotated'; credentialId: CredentialId; rotatedBy: PrincipalRef; secretHash: string; supersededCredentialId: CredentialId | undefined }
   | { type: 'ScopeGranted'; principalId: PrincipalId; scope: Scope; grantedBy: PrincipalRef }
-  | { type: 'ScopeRevoked'; principalId: PrincipalId; scope: Scope; revokedBy: PrincipalRef };
+  | { type: 'ScopeRevoked'; principalId: PrincipalId; scope: Scope; revokedBy: PrincipalRef }
+  | { type: 'ServiceRegistered'; serviceId: ServiceId; organizationId: OrganizationId; owningTeamId: TeamId; name: string; kind: 'provider' | 'consumer' | 'both'; repositoryUrl?: string; environments: ReadonlyArray<string> }
+  | { type: 'ApiContractImported'; contractId: ApiContractId; organizationId: OrganizationId; providerServiceId: ServiceId; title: string; importSource: string; importSourceUrl?: string }
+  | { type: 'ContractVersionImported'; versionId: ContractVersionId; contractId: ApiContractId; sourceRevision: string; checksum: string }
+  | { type: 'OperationImported'; operationId: OperationId; opId: string; contractId: ApiContractId; method: string; path: string; title: string }
+  | { type: 'SchemaImported'; schemaId: SchemaId; operationId: OperationId; role: 'request' | 'response' | 'error' | 'event'; shape: unknown }
+  | { type: 'ImportPartialFailure'; contractId: ApiContractId; sourceRevision: string; errors: ReadonlyArray<string> };
 
 export interface EventEnvelope<E extends DomainEvent = DomainEvent> {
   readonly eventId: string;
@@ -154,6 +166,18 @@ export function aggregateOf(event: DomainEvent): { type: AggregateType; id: stri
     case 'CredentialRevoked':
     case 'CredentialRotated':
       return { type: 'credential', id: event.credentialId };
+    case 'ServiceRegistered':
+      return { type: 'service', id: event.serviceId };
+    case 'ApiContractImported':
+      return { type: 'apiContract', id: event.contractId };
+    case 'ContractVersionImported':
+      return { type: 'contractVersion', id: event.versionId };
+    case 'OperationImported':
+      return { type: 'operation', id: event.operationId };
+    case 'SchemaImported':
+      return { type: 'schema', id: event.schemaId };
+    case 'ImportPartialFailure':
+      return { type: 'apiContract', id: event.contractId };
   }
 }
 
