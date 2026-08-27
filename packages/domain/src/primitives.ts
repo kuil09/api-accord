@@ -13,6 +13,7 @@ export type Brand<T, B extends string> = T & { readonly [brand]: B };
 export type OrganizationId = Brand<string, 'OrganizationId'>;
 export type TeamId = Brand<string, 'TeamId'>;
 export type PrincipalId = Brand<string, 'PrincipalId'>;
+export type CredentialId = Brand<string, 'CredentialId'>;
 export type ServiceId = Brand<string, 'ServiceId'>;
 export type ApiContractId = Brand<string, 'ApiContractId'>;
 export type ContractVersionId = Brand<string, 'ContractVersionId'>;
@@ -37,6 +38,7 @@ function asId<T extends Brand<string, string>>(value: string, label: string): T 
 export const organizationId = (value: string): OrganizationId => asId(value, 'OrganizationId');
 export const teamId = (value: string): TeamId => asId(value, 'TeamId');
 export const principalId = (value: string): PrincipalId => asId(value, 'PrincipalId');
+export const credentialId = (value: string): CredentialId => asId(value, 'CredentialId');
 export const serviceId = (value: string): ServiceId => asId(value, 'ServiceId');
 export const apiContractId = (value: string): ApiContractId => asId(value, 'ApiContractId');
 export const contractVersionId = (value: string): ContractVersionId => asId(value, 'ContractVersionId');
@@ -92,6 +94,34 @@ export type DriftSeverity = 'low' | 'medium' | 'high' | 'critical';
 export type ChangeProposalPhase = 'draft' | 'opened' | 'closed';
 
 export type ChangeProposalOutcome = 'none' | 'completed' | 'rejected' | 'withdrawn';
+
+// Minimum-privilege scopes (agreed in issue #4). RBAC grants a subset of these.
+export type Scope =
+  | 'context:read'
+  | 'context:propose'
+  | 'context:correct'
+  | 'proposal:create'
+  | 'proposal:comment'
+  | 'proposal:approve'
+  | 'spec:compile'
+  | 'implementation:plan'
+  | 'implementation:write'
+  | 'test:execute'
+  | 'runtime:observe';
+
+export const SCOPES: ReadonlyArray<Scope> = [
+  'context:read',
+  'context:propose',
+  'context:correct',
+  'proposal:create',
+  'proposal:comment',
+  'proposal:approve',
+  'spec:compile',
+  'implementation:plan',
+  'implementation:write',
+  'test:execute',
+  'runtime:observe'
+];
 
 // Scope a Context Item applies to.
 export type ContextScope =

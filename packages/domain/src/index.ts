@@ -6,3 +6,4 @@ export * from './events.js';
 export * from './projection.js';
 export * from './rules.js';
 export * from './service.js';
+export * from './identity.js';

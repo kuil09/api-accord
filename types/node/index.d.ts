@@ -21,6 +21,10 @@ declare const process: {
 
 declare module 'node:crypto' {
   export function randomUUID(): string;
+  export function randomBytes(size: number): Uint8Array;
+  export function createHash(algorithm: string): {
+    update(data: string): { digest(): Uint8Array };
+  };
 }
 
 declare module 'node:fs' {
@@ -88,7 +92,8 @@ declare module 'node:test' {
 
   export function describe(name: string, callback: () => void): void;
   export function it(name: string, callback: (context: TestContext) => void | Promise<void>): void;
-  export const test: typeof it;
+  const test: typeof it;
+  export { test };
 }
 
 declare module 'node:assert/strict' {
