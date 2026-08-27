@@ -33,6 +33,7 @@ import type {
   TeamId,
   OrganizationId
 } from './primitives.js';
+import type { CompatibilityPolicy, UsageDeclaration } from './model.js';
 
 export type AggregateType =
   | 'organization'
@@ -64,7 +65,9 @@ export type DomainEvent =
   | { type: 'ContractImported'; contractId: ApiContractId; organizationId: OrganizationId; providerServiceId: ServiceId; title: string }
   | { type: 'ContractVersionPublished'; versionId: ContractVersionId; contractId: ApiContractId; sourceRevision: string; checksum: string; decisionRecordId?: DecisionRecordId }
   | { type: 'OperationDeclared'; operationId: OperationId; contractId: ApiContractId; method: string; path: string; title: string }
-  | { type: 'DependencyDeclared'; edgeId: DependencyEdgeId; consumerServiceId: ServiceId; operationId: OperationId; source: string }
+  | { type: 'DependencyEdgeDeclared'; edgeId: DependencyEdgeId; consumerServiceId: ServiceId; operationId: OperationId; usage: UsageDeclaration; compatibility: CompatibilityPolicy; source: 'explicit' | 'code-analysis' | 'runtime-observation'; criticality: 'low' | 'medium' | 'high' | 'critical'; ownerTeamId?: TeamId | undefined }
+  | { type: 'DependencyAssumptionAdded'; edgeId: DependencyEdgeId; assumptionId: string; statement: string; source: 'explicit' | 'code-analysis' | 'runtime-observation'; confidence: 'unverified' | 'inferred' | 'confirmed' | 'disputed'; conflictStatus: 'none' | 'conflicting' }
+  | { type: 'DependencyEdgeDeprecated'; edgeId: DependencyEdgeId; reason: string }
   | { type: 'ContextProposed'; contextItemId: ContextItemId; scope: ContextScope; statement: string; contextType: string; author: PrincipalRef; source: string; confidence: Confidence }
   | { type: 'ContextConfirmed'; contextItemId: ContextItemId; validFrom: Date }
   | { type: 'ContextCorrected'; originalContextItemId: ContextItemId; correctionContextItemId: ContextItemId }
@@ -125,8 +128,6 @@ export function aggregateOf(event: DomainEvent): { type: AggregateType; id: stri
       return { type: 'contractVersion', id: event.versionId };
     case 'OperationDeclared':
       return { type: 'operation', id: event.operationId };
-    case 'DependencyDeclared':
-      return { type: 'dependencyEdge', id: event.edgeId };
     case 'ContextProposed':
       return { type: 'contextItem', id: event.contextItemId };
     case 'ContextConfirmed':
@@ -178,6 +179,10 @@ export function aggregateOf(event: DomainEvent): { type: AggregateType; id: stri
       return { type: 'schema', id: event.schemaId };
     case 'ImportPartialFailure':
       return { type: 'apiContract', id: event.contractId };
+    case 'DependencyEdgeDeclared':
+    case 'DependencyAssumptionAdded':
+    case 'DependencyEdgeDeprecated':
+      return { type: 'dependencyEdge', id: event.edgeId };
   }
 }
 

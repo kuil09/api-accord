@@ -8,3 +8,4 @@ export * from './rules.js';
 export * from './service.js';
 export * from './identity.js';
 export * from './catalog.js';
+export * from './dependency.js';

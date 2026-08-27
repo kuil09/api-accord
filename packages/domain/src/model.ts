@@ -94,13 +94,49 @@ export interface Schema {
   readonly shape: unknown;
 }
 
+export type DependencySource = 'explicit' | 'code-analysis' | 'runtime-observation';
+
+// Structured usage a consumer declares for an operation (issue #6).
+export interface UsageDeclaration {
+  readonly fields: ReadonlyArray<string>;
+  readonly statusValues: ReadonlyArray<string>;
+  readonly enumNullability: ReadonlyArray<string>;
+  readonly errorMeanings: ReadonlyArray<string>;
+  readonly timeoutExpectation?: string;
+  readonly retryExpectation?: string;
+  readonly idempotencyExpectation?: string;
+  readonly orderingConsistencySideEffects: ReadonlyArray<string>;
+}
+
+// A single assumption a consumer holds about an operation. Assumptions are kept
+// per-source and never averaged away; conflicting assumptions on the same
+// operation stay visible (INV-008).
+export interface DependencyAssumption {
+  readonly id: string;
+  readonly statement: string;
+  readonly source: DependencySource;
+  readonly confidence: Confidence;
+  readonly conflictStatus: 'none' | 'conflicting';
+}
+
+export interface CompatibilityPolicy {
+  readonly allowAdditiveFields: boolean;
+  readonly allowNewEnumValues: boolean;
+  readonly allowNullableChange: boolean;
+}
+
 export interface DependencyEdge {
   readonly id: DependencyEdgeId;
   readonly consumerServiceId: ServiceId;
   readonly operationId: OperationId;
-  readonly usage: unknown;
-  readonly source: string; // explicit | code-analysis | runtime-observation (INV-010)
+  readonly usage: UsageDeclaration;
+  readonly assumptions: ReadonlyArray<DependencyAssumption>;
+  readonly compatibility: CompatibilityPolicy;
+  readonly criticality: 'low' | 'medium' | 'high' | 'critical';
+  readonly ownerTeamId?: TeamId | undefined;
+  readonly source: DependencySource; // how the edge was established (INV-010)
   readonly confirmedAt: Date;
+  readonly deprecated: boolean;
 }
 
 export interface ContextItem {
