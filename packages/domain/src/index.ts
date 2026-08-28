@@ -17,3 +17,4 @@ export * from './observation.js';
 export * from './evidence.js';
 export * from './context-assembler.js';
 export * from './automation.js';
+export * from './security.js';
