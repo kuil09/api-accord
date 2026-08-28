@@ -16,6 +16,7 @@ import type {
   ContractVersionId,
   DecisionRecordId,
   DiscussionEntryId,
+  EvidenceId,
   PrincipalRef,
   ServiceId
 } from './primitives.js';
@@ -31,8 +32,11 @@ import {
   canMarkCompleted,
   canRecordDecision,
   canPublishContractVersion,
-  canPublishVersionForProposal
+  canPublishVersionForProposal,
+  canVerifyWithEvidence,
+  hasSufficientObservationSample
 } from './rules.js';
+import type { EvidenceStatus } from './primitives.js';
 
 // Raised when a command is rejected by a domain guard. Callers (API/MCP/worker)
 // catch this to return a 4xx / structured rejection rather than crashing.
@@ -76,17 +80,20 @@ export class DomainService {
     actor: PrincipalRef;
     correlationId?: string;
     proposalId: ChangeProposalId;
-    openBlockingObjections: number;
-    // When omitted, the requirement is computed from the recorded approvals in
-    // the ledger instead of trusting a caller-supplied flag.
+    // When omitted, both requirements are computed from the ledger: the open
+    // blocking-objection count from the proposal projection, and the approver
+    // requirement from the recorded approvals (issue #9/#22).
+    openBlockingObjections?: number;
     requiredApproversSatisfied?: boolean;
     reason?: string;
   }): Promise<AppendResult> {
+    const state = await this.#proposalState(input.proposalId);
+    const openBlockingObjections = input.openBlockingObjections ?? state.openBlockingObjections;
     const requiredApproversSatisfied =
       input.requiredApproversSatisfied ??
       (await this.#requiredApproversSatisfied(input.proposalId));
     const guard = canAcceptProposal({
-      openBlockingObjections: input.openBlockingObjections,
+      openBlockingObjections,
       requiredApproversSatisfied
     });
     if (!guard.ok) {
@@ -130,11 +137,40 @@ export class DomainService {
     correlationId?: string;
     proposalId: ChangeProposalId;
     reason?: string;
+    // Issue #22 / INV-021..023: when provided, verification requires passed
+    // evidence bound to the current revision; failed/stale evidence never counts.
+    evidence?: ReadonlyArray<{ readonly status: EvidenceStatus; readonly sourceRevision: string }>;
+    currentSourceRevision?: string;
   }): Promise<AppendResult> {
+    if (input.evidence !== undefined && input.currentSourceRevision !== undefined) {
+      const guard = canVerifyWithEvidence({ evidence: input.evidence, currentSourceRevision: input.currentSourceRevision });
+      if (!guard.ok) {
+        throw new DomainRuleError(guard.reason);
+      }
+    }
     return this.#append('changeProposal', input.proposalId, input.actor, input.correlationId, {
       type: 'ContractVerificationRecorded',
       proposalId: input.proposalId,
       ...(input.reason === undefined ? {} : { reason: input.reason })
+    });
+  }
+
+  // Issue #22 step 9: provider/consumer contract test results are submitted as
+  // evidence bound to a contract version and revision (INV-021).
+  async attachEvidence(input: {
+    actor: PrincipalRef;
+    correlationId?: string;
+    evidenceId: EvidenceId;
+    contractVersionId: ContractVersionId;
+    sourceRevision: string;
+    status: EvidenceStatus;
+  }): Promise<AppendResult> {
+    return this.#append('evidence', input.evidenceId, input.actor, input.correlationId, {
+      type: 'EvidenceAttached',
+      evidenceId: input.evidenceId,
+      contractVersionId: input.contractVersionId,
+      sourceRevision: input.sourceRevision,
+      status: input.status
     });
   }
 
@@ -156,7 +192,17 @@ export class DomainService {
     correlationId?: string;
     proposalId: ChangeProposalId;
     reason?: string;
+    // Issue #22 / INV-025: when provided, a sample below the policy minimum is
+    // "insufficient evidence", never a healthy verdict.
+    sampleSize?: number;
+    minimumSampleSize?: number;
   }): Promise<AppendResult> {
+    if (input.sampleSize !== undefined && input.minimumSampleSize !== undefined) {
+      const guard = hasSufficientObservationSample({ sampleSize: input.sampleSize, minimumSampleSize: input.minimumSampleSize });
+      if (!guard.ok) {
+        throw new DomainRuleError(guard.reason);
+      }
+    }
     return this.#append('changeProposal', input.proposalId, input.actor, input.correlationId, {
       type: 'ObservationRecorded',
       proposalId: input.proposalId,

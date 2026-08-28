@@ -20,6 +20,7 @@
     "db:migrate": "node scripts/migrate.mjs up",
     "db:rollback": "node scripts/migrate.mjs down",
     "db:validate": "node scripts/validate-migrations.mjs",
+    "e2e": "npm run build && node --test packages/domain/dist/e2e-baseline.test.js",
     "dev": "node scripts/dev.mjs",
     "dev:infra": "docker compose -f infra/docker-compose.yml up -d --wait postgres",
     "dev:infra:down": "docker compose -f infra/docker-compose.yml down",

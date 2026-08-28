@@ -134,3 +134,29 @@ export function canRecordDecision(input: {
   }
   return { ok: true };
 }
+
+// INV-021/022/023: contract verification requires passed evidence bound to the
+// current contract revision. failed/skipped/waived evidence never counts, and
+// evidence from an older revision is stale, not success.
+export function canVerifyWithEvidence(input: {
+  readonly evidence: ReadonlyArray<{ readonly status: 'passed' | 'failed' | 'skipped' | 'not-run' | 'waived' | 'evidence-missing'; readonly sourceRevision: string }>;
+  readonly currentSourceRevision: string;
+}): GuardResult {
+  const relevant = input.evidence.filter((entry) => entry.sourceRevision === input.currentSourceRevision);
+  if (relevant.length === 0) {
+    return { ok: false, reason: 'INV-022: no evidence is bound to the current contract revision; older evidence is stale, not success' };
+  }
+  if (!relevant.some((entry) => entry.status === 'passed')) {
+    return { ok: false, reason: 'INV-023: verification requires passed evidence; failed/skipped/waived never count as passed' };
+  }
+  return { ok: true };
+}
+
+// INV-025: an observation window below the policy minimum is "insufficient
+// evidence", never a healthy verdict.
+export function hasSufficientObservationSample(input: { readonly sampleSize: number; readonly minimumSampleSize: number }): GuardResult {
+  if (input.sampleSize < input.minimumSampleSize) {
+    return { ok: false, reason: `INV-025: insufficient observation evidence (${String(input.sampleSize)}/${String(input.minimumSampleSize)} samples)` };
+  }
+  return { ok: true };
+}
