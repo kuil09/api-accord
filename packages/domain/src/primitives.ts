@@ -82,7 +82,8 @@ export type DiscussionEntryKind =
   | 'evidence'
   | 'alternative'
   | 'correction'
-  | 'acknowledgement';
+  | 'acknowledgement'
+  | 'decision';
 
 // Evidence status must never collapse failed/skipped/waived into passed (INV-023).
 export type EvidenceStatus = 'passed' | 'failed' | 'skipped' | 'not-run' | 'waived' | 'evidence-missing';

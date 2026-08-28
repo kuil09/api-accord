@@ -160,6 +160,8 @@ export interface ContextItem {
   readonly disputed: boolean;
 }
 
+export type ResolutionStatus = 'open' | 'resolved' | 'wont-fix' | 'superseded';
+
 export interface DiscussionEntry {
   readonly id: DiscussionEntryId;
   readonly proposalId: ChangeProposalId;
@@ -168,7 +170,15 @@ export interface DiscussionEntry {
   readonly body: string;
   // A blocking objection that is unresolved prevents Accepted (INV-005).
   readonly isBlockingObjection: boolean;
-  readonly resolved: boolean;
+  // open/resolved/wont-fix/superseded are kept distinct (INV-023-style honesty).
+  readonly status: ResolutionStatus;
+  readonly affectedConsumers: ReadonlyArray<ServiceId>;
+  readonly severity?: 'low' | 'medium' | 'high' | 'critical' | undefined;
+  readonly evidenceRef?: string | undefined;
+  // Threading links: reply-to, quote-of, duplicate-of.
+  readonly inReplyTo?: DiscussionEntryId | undefined;
+  readonly quotes?: DiscussionEntryId | undefined;
+  readonly duplicateOf?: DiscussionEntryId | undefined;
 }
 
 // INV-002: acceptance, provider implementation, consumer readiness, contract
@@ -197,8 +207,19 @@ export interface DecisionRecord {
   readonly proposalId: ChangeProposalId;
   readonly decision: string;
   readonly rationale: string;
+  // Constraints accepted as part of the decision.
+  readonly constraints: ReadonlyArray<string>;
+  // Alternatives that were considered and rejected, with the reason.
+  readonly rejectedAlternatives: ReadonlyArray<{ readonly alternative: string; readonly reason: string }>;
   readonly approvers: ReadonlyArray<PrincipalRef>;
-  readonly supersededBy?: DecisionRecordId;
+  // Validity window for this decision.
+  readonly validFrom: Date;
+  readonly validUntil?: Date | undefined;
+  // Discussion entries this decision was promoted from (source links).
+  readonly sourceEntryIds: ReadonlyArray<DiscussionEntryId>;
+  // Supersede lineage: what this decision replaces and what replaces it.
+  readonly supersedes?: DecisionRecordId | undefined;
+  readonly supersededBy?: DecisionRecordId | undefined;
 }
 
 export interface Evidence {

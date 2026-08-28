@@ -15,7 +15,9 @@ import type {
   ContextScope,
   ContractVersionId,
   DecisionRecordId,
-  PrincipalRef
+  DiscussionEntryId,
+  PrincipalRef,
+  ServiceId
 } from './primitives.js';
 import type { ChangeProposalState } from './model.js';
 import type { AppendResult, AggregateType, EventStore } from './events.js';
@@ -25,6 +27,7 @@ import {
   canConfirmContext,
   canCorrectContext,
   canMarkCompleted,
+  canRecordDecision,
   canPublishContractVersion
 } from './rules.js';
 
@@ -384,6 +387,139 @@ export class DomainService {
       type: 'ContextVisibilityChanged',
       contextItemId: input.contextItemId,
       visibility: input.visibility
+    });
+  }
+
+  // INV-014: a structured utterance keeps its type, links and source so a summary
+  // can never silently drop it. A blocking objection feeds the proposal's counter.
+  async createDiscussionEntry(input: {
+    actor: PrincipalRef;
+    correlationId?: string;
+    entryId: DiscussionEntryId;
+    proposalId: ChangeProposalId;
+    kind: 'question' | 'proposal' | 'objection' | 'constraint' | 'assumption' | 'evidence' | 'alternative' | 'correction' | 'acknowledgement' | 'decision';
+    body: string;
+    isBlockingObjection?: boolean;
+    affectedConsumers?: ReadonlyArray<ServiceId>;
+    severity?: 'low' | 'medium' | 'high' | 'critical' | undefined;
+    evidenceRef?: string | undefined;
+    inReplyTo?: DiscussionEntryId | undefined;
+    quotes?: DiscussionEntryId | undefined;
+    duplicateOf?: DiscussionEntryId | undefined;
+  }): Promise<AppendResult> {
+    return this.#append('discussionEntry', input.entryId, input.actor, input.correlationId, {
+      type: 'DiscussionEntryCreated',
+      entryId: input.entryId,
+      proposalId: input.proposalId,
+      kind: input.kind,
+      author: input.actor,
+      body: input.body,
+      isBlockingObjection: input.isBlockingObjection ?? false,
+      affectedConsumers: input.affectedConsumers ?? [],
+      severity: input.severity,
+      evidenceRef: input.evidenceRef,
+      inReplyTo: input.inReplyTo,
+      quotes: input.quotes,
+      duplicateOf: input.duplicateOf
+    });
+  }
+
+  // Raises a blocking objection: it also increments the proposal's open-objection
+  // counter so the acceptance guard (INV-005) sees it.
+  async raiseBlockingObjection(input: {
+    actor: PrincipalRef;
+    correlationId?: string;
+    entryId: DiscussionEntryId;
+    proposalId: ChangeProposalId;
+  }): Promise<AppendResult> {
+    return this.#append('changeProposal', input.proposalId, input.actor, input.correlationId, {
+      type: 'BlockingObjectionRaised',
+      proposalId: input.proposalId,
+      entryId: input.entryId
+    });
+  }
+
+  async resolveDiscussionEntry(input: {
+    actor: PrincipalRef;
+    correlationId?: string;
+    entryId: DiscussionEntryId;
+    proposalId: ChangeProposalId;
+    status: 'resolved' | 'wont-fix' | 'superseded';
+  }): Promise<AppendResult> {
+    return this.#append('discussionEntry', input.entryId, input.actor, input.correlationId, {
+      type: 'DiscussionEntryResolved',
+      entryId: input.entryId,
+      proposalId: input.proposalId,
+      status: input.status,
+      resolvedBy: input.actor
+    });
+  }
+
+  async resolveBlockingObjection(input: {
+    actor: PrincipalRef;
+    correlationId?: string;
+    entryId: DiscussionEntryId;
+    proposalId: ChangeProposalId;
+  }): Promise<AppendResult> {
+    return this.#append('changeProposal', input.proposalId, input.actor, input.correlationId, {
+      type: 'BlockingObjectionResolved',
+      proposalId: input.proposalId,
+      entryId: input.entryId
+    });
+  }
+
+  // INV-013: promotes a fixed decision (rationale, constraints, rejected
+  // alternatives, approvers, validity) rather than a loose discussion summary.
+  async recordDecision(input: {
+    actor: PrincipalRef;
+    correlationId?: string;
+    decisionRecordId: DecisionRecordId;
+    proposalId: ChangeProposalId;
+    decision: string;
+    rationale: string;
+    constraints?: ReadonlyArray<string>;
+    rejectedAlternatives?: ReadonlyArray<{ readonly alternative: string; readonly reason: string }>;
+    approvers: ReadonlyArray<PrincipalRef>;
+    validFrom: Date;
+    validUntil?: Date | undefined;
+    sourceEntryIds?: ReadonlyArray<DiscussionEntryId>;
+    supersedes?: DecisionRecordId | undefined;
+  }): Promise<AppendResult> {
+    const guard = canRecordDecision({
+      decision: input.decision,
+      rationale: input.rationale,
+      approvers: input.approvers,
+      validFrom: input.validFrom
+    });
+    if (!guard.ok) {
+      throw new DomainRuleError(guard.reason);
+    }
+    return this.#append('decisionRecord', input.decisionRecordId, input.actor, input.correlationId, {
+      type: 'DecisionRecorded',
+      decisionRecordId: input.decisionRecordId,
+      proposalId: input.proposalId,
+      decision: input.decision,
+      rationale: input.rationale,
+      constraints: input.constraints ?? [],
+      rejectedAlternatives: input.rejectedAlternatives ?? [],
+      approvers: input.approvers,
+      validFrom: input.validFrom,
+      validUntil: input.validUntil,
+      sourceEntryIds: input.sourceEntryIds ?? [],
+      supersedes: input.supersedes
+    });
+  }
+
+  async supersedeDecision(input: {
+    actor: PrincipalRef;
+    correlationId?: string;
+    originalDecisionRecordId: DecisionRecordId;
+    supersedingDecisionRecordId: DecisionRecordId;
+  }): Promise<AppendResult> {
+    return this.#append('decisionRecord', input.originalDecisionRecordId, input.actor, input.correlationId, {
+      type: 'DecisionSuperseded',
+      originalDecisionRecordId: input.originalDecisionRecordId,
+      supersedingDecisionRecordId: input.supersedingDecisionRecordId
     });
   }
 }
