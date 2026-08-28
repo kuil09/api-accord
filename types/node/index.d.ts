@@ -40,6 +40,7 @@ declare module 'node:http' {
   export interface IncomingMessage {
     method?: string;
     url?: string;
+    on(event: string, listener: (...args: never[]) => void): this;
     headers: Record<string, string | readonly string[] | undefined>;
   }
 

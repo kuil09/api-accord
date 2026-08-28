@@ -1,7 +1,9 @@
 import { createLogger, errorMetadata, loadAppConfig, loadDotEnvFile, requireDatabaseUrl } from '@api-accord/config';
 
 import { createApiApplication } from './app.js';
+import { createPostgresEventStore } from './event-store.js';
 import { createPostgresResources } from './postgres.js';
+import { DomainService } from '@api-accord/domain';
 
 loadDotEnvFile();
 
@@ -12,9 +14,26 @@ const logger = createLogger({
 });
 const databaseUrl = requireDatabaseUrl(config);
 const postgres = createPostgresResources(databaseUrl);
+const eventStore = createPostgresEventStore(databaseUrl);
+const domainService = new DomainService(eventStore);
+
+// Issue #13: GitHub webhook ingestion is enabled when a webhook secret is
+// configured; replay defense tracks processed delivery ids for this process.
+const githubWebhookSecret = process.env['GITHUB_WEBHOOK_SECRET'];
+const seenDeliveryIds: string[] = [];
 const application = createApiApplication({
   logger,
-  readinessProbe: postgres.readinessProbe
+  readinessProbe: postgres.readinessProbe,
+  ...(githubWebhookSecret !== undefined && githubWebhookSecret.trim().length > 0
+    ? {
+        github: {
+          webhookSecret: githubWebhookSecret,
+          store: eventStore,
+          domain: domainService,
+          seenDeliveryIds
+        }
+      }
+    : {})
 });
 
 application.server.listen(config.port, () => {

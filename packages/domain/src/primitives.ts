@@ -86,7 +86,7 @@ export type DiscussionEntryKind =
   | 'decision';
 
 // Evidence status must never collapse failed/skipped/waived into passed (INV-023).
-export type EvidenceStatus = 'passed' | 'failed' | 'skipped' | 'not-run' | 'waived' | 'evidence-missing';
+export type EvidenceStatus = 'passed' | 'failed' | 'skipped' | 'not-run' | 'waived' | 'evidence-missing' | 'recorded';
 
 export type DriftSeverity = 'low' | 'medium' | 'high' | 'critical';
 
