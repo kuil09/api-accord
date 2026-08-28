@@ -48,6 +48,9 @@ export function canConfirmContext(input: {
   readonly scope: ContextScope;
   readonly validFrom: Date;
 }): GuardResult {
+  if (input.author.kind !== 'human') {
+    return { ok: false, reason: 'INV: only a human principal can confirm a context item (AI output stays unverified until a human approves)' };
+  }
   if (input.source.trim().length === 0) {
     return { ok: false, reason: 'INV-011: confirmed context requires a source' };
   }

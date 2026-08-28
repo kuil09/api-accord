@@ -72,6 +72,11 @@ export type DomainEvent =
   | { type: 'ContextConfirmed'; contextItemId: ContextItemId; validFrom: Date }
   | { type: 'ContextCorrected'; originalContextItemId: ContextItemId; correctionContextItemId: ContextItemId }
   | { type: 'ContextSuperseded'; originalContextItemId: ContextItemId; supersedingContextItemId: ContextItemId; from: Date }
+  | { type: 'ContextChallenged'; contextItemId: ContextItemId; challenger: PrincipalRef; reason: string }
+  | { type: 'ContextNarrowedScope'; contextItemId: ContextItemId; scope: ContextScope; previousScope: ContextScope }
+  | { type: 'ContextEvidenceAdded'; contextItemId: ContextItemId; evidenceRef: string }
+  | { type: 'ContextExpired'; contextItemId: ContextItemId; at: Date }
+  | { type: 'ContextVisibilityChanged'; contextItemId: ContextItemId; visibility: 'public' | 'organization' | 'team' }
   | { type: 'ChangeProposalOpened'; proposalId: ChangeProposalId; contractId: ApiContractId; title: string }
   | { type: 'ChangeProposalAccepted'; proposalId: ChangeProposalId }
   | { type: 'ProviderImplementationRecorded'; proposalId: ChangeProposalId }
@@ -136,6 +141,12 @@ export function aggregateOf(event: DomainEvent): { type: AggregateType; id: stri
       return { type: 'contextItem', id: event.originalContextItemId };
     case 'ContextSuperseded':
       return { type: 'contextItem', id: event.originalContextItemId };
+    case 'ContextChallenged':
+    case 'ContextNarrowedScope':
+    case 'ContextEvidenceAdded':
+    case 'ContextExpired':
+    case 'ContextVisibilityChanged':
+      return { type: 'contextItem', id: event.contextItemId };
     case 'ChangeProposalOpened':
     case 'ChangeProposalAccepted':
     case 'ProviderImplementationRecorded':
