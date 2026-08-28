@@ -534,3 +534,21 @@ export function proposalWorkItemsFrom(
   }
   return [...items.values()];
 }
+
+// Reconstructs every dependency edge in the ledger (issue #11 staleness input).
+export function allDependencyEdges(events: ReadonlyArray<EventEnvelope<DomainEvent>>): ReadonlyArray<DependencyEdge> {
+  const edgeIds = new Set<DependencyEdgeId>();
+  for (const envelope of events) {
+    if (envelope.aggregateType === 'dependencyEdge') {
+      edgeIds.add(envelope.aggregateId as DependencyEdgeId);
+    }
+  }
+  const edges: DependencyEdge[] = [];
+  for (const edgeId of edgeIds) {
+    const edge = dependencyEdgeFrom(events, edgeId);
+    if (edge !== undefined) {
+      edges.push(edge);
+    }
+  }
+  return edges.sort((left, right) => left.id.localeCompare(right.id));
+}
