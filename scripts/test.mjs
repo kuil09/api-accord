@@ -7,7 +7,8 @@ const roots = [
   'apps/web/dist',
   'apps/worker/dist',
   'packages/config/dist',
-  'packages/domain/dist'
+  'packages/domain/dist',
+  'packages/mcp/dist'
 ];
 const testFiles = [];
 for (const root of roots) {
