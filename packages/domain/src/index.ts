@@ -15,3 +15,4 @@ export * from './compiler.js';
 export * from './seed.js';
 export * from './observation.js';
 export * from './evidence.js';
+export * from './context-assembler.js';
