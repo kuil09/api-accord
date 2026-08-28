@@ -552,3 +552,21 @@ export function allDependencyEdges(events: ReadonlyArray<EventEnvelope<DomainEve
   }
   return edges.sort((left, right) => left.id.localeCompare(right.id));
 }
+
+// Reconstructs every context item in the ledger (issue #14 MCP reads).
+export function allContextItems(events: ReadonlyArray<EventEnvelope<DomainEvent>>): ReadonlyArray<ContextItem> {
+  const ids = new Set<ContextItemId>();
+  for (const envelope of events) {
+    if (envelope.aggregateType === 'contextItem') {
+      ids.add(envelope.aggregateId as ContextItemId);
+    }
+  }
+  const items: ContextItem[] = [];
+  for (const id of ids) {
+    const item = contextItemFrom(events, id);
+    if (item !== undefined) {
+      items.push(item);
+    }
+  }
+  return items.sort((left, right) => left.id.localeCompare(right.id));
+}
