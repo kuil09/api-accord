@@ -181,6 +181,18 @@ export interface DiscussionEntry {
   readonly duplicateOf?: DiscussionEntryId | undefined;
 }
 
+export type WorkItemKind = 'implementation' | 'test' | 'deployment' | 'migration';
+
+// A change work item with an assigned principal (issue #9).
+export interface ProposalWorkItem {
+  readonly id: string;
+  readonly kind: WorkItemKind;
+  readonly description: string;
+  readonly assignedTo: PrincipalRef;
+  readonly createdAt: Date;
+  readonly completedAt?: Date | undefined;
+}
+
 // INV-002: acceptance, provider implementation, consumer readiness, contract
 // verification, deployment and observation are independent states. A single
 // success never implies another.
