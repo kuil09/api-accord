@@ -4,7 +4,8 @@ import { performance } from 'node:perf_hooks';
 import type { HealthResponse, ReadinessResponse } from '@api-accord/contracts';
 import type { Logger } from '@api-accord/config';
 import { errorMetadata } from '@api-accord/config';
-import { correlationIdFromHeader } from '@api-accord/domain';
+import { correlationIdFromHeader, type DomainService, type EventStore } from '@api-accord/domain';
+import { ingestWebhookDelivery, WebhookSignatureError } from './github.js';
 
 export interface ReadinessProbe {
   readonly name: string;
@@ -14,6 +15,16 @@ export interface ReadinessProbe {
 export interface ApiApplicationOptions {
   readonly logger: Logger;
   readonly readinessProbe: ReadinessProbe;
+  // Issue #13: when configured, POST /webhooks/github ingests signed GitHub
+  // events into evidence over the shared event store.
+  readonly github?: {
+    readonly webhookSecret: string;
+    readonly store: EventStore;
+    readonly domain: DomainService;
+    // The app records processed delivery ids here so replays are acknowledged
+    // without re-handling.
+    readonly seenDeliveryIds: string[];
+  };
 }
 
 export interface ApiApplication {
@@ -45,6 +56,29 @@ async function handleRequest(
   response.setHeader('x-correlation-id', correlationId);
 
   try {
+    if (options.github !== undefined && request.method === 'POST' && url.pathname === '/webhooks/github') {
+      const rawBody = await readBody(request);
+      const deliveryId = headerString(request.headers['x-github-delivery']) ?? '';
+      const outcome = await ingestWebhookDelivery(
+        {
+          deliveryId,
+          event: headerString(request.headers['x-github-event']) ?? '',
+          signatureHeader: headerString(request.headers['x-hub-signature-256']),
+          payload: rawBody
+        },
+        {
+          webhookSecret: options.github.webhookSecret,
+          store: options.github.store,
+          domain: options.github.domain,
+          seenDeliveryIds: options.github.seenDeliveryIds
+        }
+      );
+      options.github.seenDeliveryIds.push(deliveryId);
+      statusCode = 200;
+      writeJson(response, statusCode, { ...outcome, correlationId });
+      return;
+    }
+
     if (request.method !== 'GET') {
       statusCode = 405;
       writeJson(response, statusCode, {
@@ -117,6 +151,11 @@ async function handleRequest(
       correlationId
     });
   } catch (error) {
+    if (error instanceof WebhookSignatureError) {
+      statusCode = 401;
+      writeJson(response, statusCode, { error: 'invalid_signature', correlationId });
+      return;
+    }
     statusCode = 500;
     options.logger.error('api.request.failed', {
       correlationId,
@@ -156,5 +195,27 @@ function closeServer(server: Server): Promise<void> {
         reject(error);
       }
     });
+  });
+}
+
+
+function headerString(value: string | readonly string[] | undefined): string | undefined {
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+  return undefined;
+}
+
+function readBody(request: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let data = '';
+    request.on('data', (chunk: string) => {
+      data += chunk;
+    });
+    request.on('end', () => resolve(data));
+    request.on('error', reject);
   });
 }

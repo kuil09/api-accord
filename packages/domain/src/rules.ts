@@ -3,6 +3,7 @@
 // discriminated result so callers never treat a rejection as success.
 
 import type { ChangeProposalState, ContextItem } from './model.js';
+import type { EvidenceStatus } from './primitives.js';
 import type { ContextScope, ContractVersionId, PrincipalRef } from './primitives.js';
 
 export type GuardResult =
@@ -139,7 +140,7 @@ export function canRecordDecision(input: {
 // current contract revision. failed/skipped/waived evidence never counts, and
 // evidence from an older revision is stale, not success.
 export function canVerifyWithEvidence(input: {
-  readonly evidence: ReadonlyArray<{ readonly status: 'passed' | 'failed' | 'skipped' | 'not-run' | 'waived' | 'evidence-missing'; readonly sourceRevision: string }>;
+  readonly evidence: ReadonlyArray<{ readonly status: EvidenceStatus; readonly sourceRevision: string }>;
   readonly currentSourceRevision: string;
 }): GuardResult {
   const relevant = input.evidence.filter((entry) => entry.sourceRevision === input.currentSourceRevision);
