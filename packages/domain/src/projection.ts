@@ -226,8 +226,8 @@ function contradicts(statementA: string, statementB: string): boolean {
 
 function polarity(text: string): 1 | -1 | 0 {
   const t = text.toLowerCase();
-  if (/not|never|does not|doesn't|isn't|aren't|without/u.test(t)) return -1;
-  if (/always|must|is|exists|requires|guarantees/u.test(t)) return 1;
+  if (/optional/u.test(t) || (/not|never|does not|doesn't|isn't|aren't|without/u.test(t))) return -1;
+  if (/always|must|is|exists|requires|guarantees|present/u.test(t)) return 1;
   return 0;
 }
 

@@ -26,7 +26,7 @@ export interface DeclareDependencyInput {
   compatibility: CompatibilityPolicy;
   criticality: 'low' | 'medium' | 'high' | 'critical';
   source: DependencySource;
-  ownerTeamId?: TeamId;
+  ownerTeamId?: TeamId | undefined;
 }
 
 export class DependencyService {
