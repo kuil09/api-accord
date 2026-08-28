@@ -37,6 +37,7 @@ import type {
 import type { CompatibilityPolicy, EvidenceKind, ResolutionStatus, UsageDeclaration, WorkItemKind } from './model.js';
 import type { ImpactAnalysisSnapshot } from './impact.js';
 import type { ObservationKind } from './observation.js';
+import type { NotificationKind, NotificationLink, NotificationStatus, Recipient } from './notification.js';
 
 export type AggregateType =
   | 'organization'
@@ -57,6 +58,8 @@ export type AggregateType =
   | 'principal'
   | 'credential'
   | 'driftIncident'
+  | 'notification'
+  | 'subscription'
   | 'service'
   | 'apiContract'
   | 'contractVersion'
@@ -106,6 +109,9 @@ export type DomainEvent =
   | { type: 'RuntimeObservationRecorded'; observationId: ObservationId; operationId: string; environment: string; contractVersionId: string; deploymentRevision: string; collectorVersion: string; kind: ObservationKind; severity: DriftSeverity; fingerprint: string; redactedDetail: Record<string, unknown>; sampleSize: number; at: Date }
   | { type: 'DriftIncidentResolved'; incidentId: string; resolution: 'false-positive' | 'accepted-deviation' | 'fixed' | 'expired'; reason: string; resolvedBy: PrincipalRef; at: Date }
   | { type: 'DriftPromotedToCandidate'; incidentId: string; contextItemId: ContextItemId; promotedBy: PrincipalRef; at: Date }
+  | { type: 'NotificationDispatched'; notificationId: string; dedupKey: string; kind: NotificationKind; recipient: Recipient; reason: string; requiredAction?: string | undefined; deadline?: Date | undefined; blocking: boolean; link: NotificationLink; channel: 'in-app' | 'email' | 'webhook'; at: Date }
+  | { type: 'NotificationStatusChanged'; notificationId: string; dedupKey: string; status: NotificationStatus; snoozedUntil?: Date | undefined; assignee?: Recipient | undefined; at: Date }
+  | { type: 'SubscriptionDeclared'; subscriptionId: string; subscriber: Recipient; scope: 'service' | 'operation' | 'proposal'; targetId: string; digest: 'immediate' | 'daily' | 'weekly'; declaredBy: PrincipalRef; at: Date }
   | { type: 'DiscussionEntryCreated'; entryId: DiscussionEntryId; proposalId: ChangeProposalId; kind: DiscussionEntryKind; author: PrincipalRef; body: string; isBlockingObjection: boolean; affectedConsumers: ReadonlyArray<ServiceId>; severity?: 'low' | 'medium' | 'high' | 'critical' | undefined; evidenceRef?: string | undefined; inReplyTo?: DiscussionEntryId | undefined; quotes?: DiscussionEntryId | undefined; duplicateOf?: DiscussionEntryId | undefined }
   | { type: 'DiscussionEntryResolved'; entryId: DiscussionEntryId; proposalId: ChangeProposalId; status: Exclude<ResolutionStatus, 'open'>; resolvedBy: PrincipalRef }
   | { type: 'DecisionRecorded'; decisionRecordId: DecisionRecordId; proposalId: ChangeProposalId; decision: string; rationale: string; constraints: ReadonlyArray<string>; rejectedAlternatives: ReadonlyArray<{ readonly alternative: string; readonly reason: string }>; approvers: ReadonlyArray<PrincipalRef>; validFrom: Date; validUntil?: Date | undefined; sourceEntryIds: ReadonlyArray<DiscussionEntryId>; supersedes?: DecisionRecordId | undefined }
@@ -194,6 +200,11 @@ export function aggregateOf(event: DomainEvent): { type: AggregateType; id: stri
     case 'DriftIncidentResolved':
     case 'DriftPromotedToCandidate':
       return { type: 'driftIncident', id: event.incidentId };
+    case 'NotificationDispatched':
+    case 'NotificationStatusChanged':
+      return { type: 'notification', id: event.notificationId };
+    case 'SubscriptionDeclared':
+      return { type: 'subscription', id: event.subscriptionId };
     case 'DiscussionEntryCreated':
     case 'DiscussionEntryResolved':
       return { type: 'discussionEntry', id: event.entryId };
