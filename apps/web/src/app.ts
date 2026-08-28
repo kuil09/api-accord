@@ -7,10 +7,14 @@ import type { HealthResponse, ReadinessResponse } from '@api-accord/contracts';
 import type { Logger } from '@api-accord/config';
 import { errorMetadata } from '@api-accord/config';
 import { correlationIdFromHeader } from '@api-accord/domain';
+import { handleDomainRoute, HttpError, type WebDomainContext } from './domain-routes.js';
 
 export interface WebApplicationOptions {
   readonly logger: Logger;
   readonly publicDirectory?: string;
+  // Issue #20: when present, the web app serves domain-backed read API and
+  // screens over the shared event ledger (INV-029: same domain services).
+  readonly domain?: WebDomainContext;
 }
 
 export interface WebApplication {
@@ -27,7 +31,7 @@ const STATIC_PATHS: Readonly<Record<string, string>> = {
 export function createWebApplication(options: WebApplicationOptions): WebApplication {
   const publicDirectory = options.publicDirectory ?? DEFAULT_PUBLIC_DIRECTORY;
   const server = createServer((request, response) => {
-    void handleRequest(request, response, options.logger, publicDirectory);
+    void handleRequest(request, response, options.logger, publicDirectory, options.domain);
   });
 
   return {
@@ -40,7 +44,8 @@ async function handleRequest(
   request: IncomingMessage,
   response: ServerResponse,
   logger: Logger,
-  publicDirectory: string
+  publicDirectory: string,
+  domain?: WebDomainContext
 ): Promise<void> {
   const correlationId = correlationIdFromHeader(request.headers['x-correlation-id']);
   const url = new URL(request.url ?? '/', 'http://api-accord.local');
@@ -49,6 +54,30 @@ async function handleRequest(
   if (request.method !== 'GET') {
     writeJson(response, 405, { error: 'method_not_allowed', correlationId });
     return;
+  }
+
+  if (domain !== undefined && (url.pathname.startsWith('/api/') || url.pathname.startsWith('/ui/'))) {
+    try {
+      const result = await handleDomainRoute(url, await domain.store.getAll(), typeof request.headers['x-organization-id'] === 'string' ? request.headers['x-organization-id'] : undefined, correlationId);
+      if (result.handled) {
+        if (result.contentType === 'json') {
+          writeJson(response, result.statusCode, JSON.parse(result.body));
+        } else {
+          response.statusCode = result.statusCode;
+          response.setHeader('content-type', 'text/html; charset=utf-8');
+          response.end(result.body);
+        }
+        return;
+      }
+    } catch (error) {
+      if (error instanceof HttpError) {
+        writeJson(response, error.statusCode, { error: error.code, message: error.message, correlationId });
+        return;
+      }
+      logger.error('web.domain_route.failed', { correlationId, path: url.pathname, ...errorMetadata(error) });
+      writeJson(response, 500, { error: 'internal', correlationId });
+      return;
+    }
   }
 
   if (url.pathname === '/health') {

@@ -64,6 +64,9 @@ export class FailingAiModel implements AiModelAdapter {
 
 export interface BundleClaim {
   readonly statement: string;
+  // Author provenance: AI vs human vs runtime is visually distinguished in the
+  // UI (issue #18/#20 completion condition).
+  readonly author?: PrincipalRef | undefined;
   readonly confidence: 'confirmed' | 'unverified' | 'inferred' | 'disputed';
   // Source reference (e.g. 'context:ctx-1', 'edge:edge-1', 'decision:dec-1',
   // 'drift:<incidentId>'); evidenceless claims carry no sourceRef.
@@ -117,6 +120,7 @@ export interface AssembleInput {
 function claimFromContextItem(item: ContextItem): BundleClaim {
   return {
     statement: item.statement,
+    author: item.author,
     confidence: item.confidence,
     sourceRef: item.source.trim().length > 0 ? `context:${item.id} via ${item.source}` : undefined,
     evidenceless: item.source.trim().length === 0
@@ -187,6 +191,7 @@ export function assembleContextBundle(input: AssembleInput): ContextBundle {
   const incidents = driftIncidentsFrom(input.events).filter((incident) => incident.status === 'open' && (input.operationKey === undefined || incident.operationId.includes(input.operationKey)));
   const mismatches: BundleClaim[] = incidents.map((incident: DriftIncident) => ({
     statement: `${incident.kind} observed on '${incident.operationId}' in ${incident.environment} against ${incident.contractVersionId} @ ${incident.deploymentRevision} (${String(incident.occurrences)} occurrence(s))`,
+    author: { kind: 'integration', id: 'runtime-observer' },
     confidence: 'confirmed' as const,
     sourceRef: `drift:${incident.incidentId}`,
     evidenceless: false
@@ -278,6 +283,7 @@ export function decisionClaimsFrom(events: ReadonlyArray<EventEnvelope<DomainEve
     }
     const claim: BundleClaim = {
       statement: `Decision: ${record.decision} (approvers: ${record.approvers.map((approver) => approver.id).join(', ')})`,
+    author: record.approvers[0],
       confidence: 'confirmed',
       sourceRef: `decision:${record.id}`,
       evidenceless: false

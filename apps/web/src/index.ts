@@ -9,10 +9,15 @@ const logger = createLogger({
   service: 'web',
   minimumLevel: config.logLevel
 });
+
+// Issue #20: the web app serves domain-backed read API and screens when a
+// domain context (shared event ledger) is provided. Production wiring of the
+// PostgreSQL EventStore adapter requires a shared persistence package
+// (follow-up issue); tests inject an InMemoryEventStore over the same routes.
 const application = createWebApplication({ logger });
 
 application.server.listen(config.port, () => {
-  logger.info('web.started', { port: config.port, nodeEnv: config.nodeEnv });
+  logger.info('web.started', { port: config.port, nodeEnv: config.nodeEnv, domainBacked: false });
 });
 
 let shuttingDown = false;
