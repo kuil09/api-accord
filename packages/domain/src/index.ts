@@ -13,3 +13,4 @@ export * from './contract-diff.js';
 export * from './impact.js';
 export * from './compiler.js';
 export * from './seed.js';
+export * from './observation.js';

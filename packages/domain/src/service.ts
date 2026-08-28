@@ -17,13 +17,16 @@ import type {
   DecisionRecordId,
   DiscussionEntryId,
   EvidenceId,
+  ObservationId,
   PrincipalRef,
   ServiceId
 } from './primitives.js';
+import { contextItemId } from './primitives.js';
 import type { ChangeProposalState } from './model.js';
 import type { AppendResult, AggregateType, EventStore } from './events.js';
 import { allDependencyEdges, changeProposalState, consumerReadinessFrom, contextItemFrom, proposalApprovalsFrom, proposalWorkItemsFrom } from './projection.js';
 import { canAmendImpactAnalysis, isImpactAnalysisStale } from './impact.js';
+import { canPromoteDriftIncident, canResolveDriftIncident, driftIncidentsFrom, fingerprintOf, redactDetail } from './observation.js';
 import type { ImpactAnalysisSnapshot } from './impact.js';
 import {
   canAcceptProposal,
@@ -699,6 +702,103 @@ export class DomainService {
       consumerServiceId: input.consumerServiceId,
       acknowledgedBy: input.actor
     });
+  }
+
+  // Issue #17: ingests a runtime observation. Redaction happens HERE, centrally,
+  // so raw payloads never reach the ledger (INV-031); the collector version and
+  // contract version ride along for traceability.
+  async recordRuntimeObservation(input: {
+    actor: PrincipalRef;
+    correlationId?: string;
+    observationId: ObservationId;
+    operationId: string;
+    environment: string;
+    contractVersionId: string;
+    deploymentRevision: string;
+    collectorVersion: string;
+    kind: 'schema-violation' | 'undocumented-status' | 'enum-violation' | 'nullability-violation' | 'missing-field' | 'undocumented-field' | 'slo-violation' | 'idempotency-anomaly' | 'undocumented-operation' | 'revision-mismatch';
+    severity?: 'low' | 'medium' | 'high' | 'critical';
+    detail: Readonly<Record<string, unknown>>;
+    redactionPolicy: { readonly deniedFields: ReadonlyArray<string>; readonly literalFields: ReadonlyArray<string> };
+    sampleSize?: number;
+    at?: Date;
+  }): Promise<AppendResult> {
+    const redacted = redactDetail(input.detail, input.redactionPolicy);
+    const fingerprint = fingerprintOf(input.kind, input.operationId, input.environment, JSON.stringify(redacted));
+    return this.#append('observation', input.observationId, input.actor, input.correlationId, {
+      type: 'RuntimeObservationRecorded',
+      observationId: input.observationId,
+      operationId: input.operationId,
+      environment: input.environment,
+      contractVersionId: input.contractVersionId,
+      deploymentRevision: input.deploymentRevision,
+      collectorVersion: input.collectorVersion,
+      kind: input.kind,
+      severity: input.severity ?? 'medium',
+      fingerprint,
+      redactedDetail: redacted,
+      sampleSize: input.sampleSize ?? 1,
+      at: input.at ?? new Date()
+    });
+  }
+
+  async resolveDriftIncident(input: {
+    actor: PrincipalRef;
+    correlationId?: string;
+    incidentId: string;
+    resolution: 'false-positive' | 'accepted-deviation' | 'fixed' | 'expired';
+    reason: string;
+  }): Promise<AppendResult> {
+    const guard = canResolveDriftIncident({ resolution: input.resolution, reason: input.reason });
+    if (!guard.ok) {
+      throw new DomainRuleError(guard.reason);
+    }
+    return this.#append('driftIncident', input.incidentId, input.actor, input.correlationId, {
+      type: 'DriftIncidentResolved',
+      incidentId: input.incidentId,
+      resolution: input.resolution,
+      reason: input.reason,
+      resolvedBy: input.actor,
+      at: new Date()
+    });
+  }
+
+  // INV-024: promotion turns an open drift incident into an unverified context
+  // candidate for review; it never modifies the contract or a decision.
+  async promoteDriftIncident(input: {
+    actor: PrincipalRef;
+    correlationId?: string;
+    incidentId: string;
+  }): Promise<AppendResult> {
+    const all = await this.#store.getAll();
+    const incident = driftIncidentsFrom(all).find((candidate) => candidate.incidentId === input.incidentId);
+    if (incident === undefined) {
+      throw new DomainRuleError('issue #17: drift incident not found');
+    }
+    const statement = `Runtime observation: ${incident.kind} on '${incident.operationId}' in ${incident.environment} (${String(incident.occurrences)} occurrence(s) against ${incident.contractVersionId} @ ${incident.deploymentRevision})`;
+    const guard = canPromoteDriftIncident({ incident, statement });
+    if (!guard.ok) {
+      throw new DomainRuleError(guard.reason);
+    }
+    const correctionItemId = contextItemId(`ctx-drift-${input.incidentId.replace(/[^a-zA-Z0-9-]/gu, '-')}`);
+    const promoted = await this.#append('driftIncident', input.incidentId, input.actor, input.correlationId, {
+      type: 'DriftPromotedToCandidate',
+      incidentId: input.incidentId,
+      contextItemId: correctionItemId,
+      promotedBy: input.actor,
+      at: new Date()
+    });
+    await this.#append('contextItem', correctionItemId, input.actor, input.correlationId, {
+      type: 'ContextProposed',
+      contextItemId: correctionItemId,
+      scope: 'operation',
+      statement,
+      contextType: 'observation',
+      author: input.actor,
+      source: `drift incident ${input.incidentId}`,
+      confidence: 'unverified'
+    });
+    return promoted;
   }
 
   // Computes the approver requirement from the ledger instead of a caller flag.
