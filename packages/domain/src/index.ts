@@ -9,3 +9,4 @@ export * from './service.js';
 export * from './identity.js';
 export * from './catalog.js';
 export * from './dependency.js';
+export * from './contract-diff.js';
