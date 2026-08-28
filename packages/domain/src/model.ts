@@ -234,12 +234,43 @@ export interface DecisionRecord {
   readonly supersededBy?: DecisionRecordId | undefined;
 }
 
+export type EvidenceProvenance = 'github-check' | 'direct-submission';
+
+export type EvidenceKind =
+  | 'source-commit'
+  | 'pull-request'
+  | 'provider-contract-test'
+  | 'consumer-contract-test'
+  | 'schema-validation'
+  | 'generated-checksum'
+  | 'ci-check'
+  | 'deployment-revision'
+  | 'canary-result'
+  | 'runtime-observation'
+  | 'manual-verification'
+  | 'waiver';
+
+// Issue #16 common evidence model: type, producer, subject, environment,
+// result, source, checksum, observed/expires. Optional metadata extends the
+// minimal #22 shape without breaking existing evidence.
 export interface Evidence {
   readonly id: EvidenceId;
   readonly contractVersionId: ContractVersionId;
   readonly sourceRevision: string;
   readonly status: EvidenceStatus;
   readonly attachedAt: Date;
+  readonly kind?: EvidenceKind | undefined;
+  readonly producer?: PrincipalRef | undefined;
+  readonly environment?: string | undefined;
+  readonly source?: string | undefined;
+  readonly checksum?: string | undefined;
+  readonly observedAt?: Date | undefined;
+  readonly expiresAt?: Date | undefined;
+  // Scope of consumer-scoped evidence (consumer contract tests).
+  readonly consumerServiceId?: ServiceId | undefined;
+  readonly provenance?: EvidenceProvenance | undefined;
+  // For waivers: which requirement kind this waiver covers.
+  readonly waivedKind?: EvidenceKind | undefined;
 }
 
 export interface Deployment {
