@@ -26,6 +26,7 @@ import type { ChangeProposalState } from './model.js';
 import type { AppendResult, AggregateType, EventStore } from './events.js';
 import { allDependencyEdges, changeProposalState, consumerReadinessFrom, contextItemFrom, proposalApprovalsFrom, proposalWorkItemsFrom } from './projection.js';
 import { canAmendImpactAnalysis, isImpactAnalysisStale } from './impact.js';
+import { canGrantWaiver } from './evidence.js';
 import { canPromoteDriftIncident, canResolveDriftIncident, driftIncidentsFrom, fingerprintOf, redactDetail } from './observation.js';
 import type { ImpactAnalysisSnapshot } from './impact.js';
 import {
@@ -40,6 +41,7 @@ import {
   hasSufficientObservationSample
 } from './rules.js';
 import type { EvidenceStatus } from './primitives.js';
+import type { EvidenceKind } from './model.js';
 
 // Raised when a command is rejected by a domain guard. Callers (API/MCP/worker)
 // catch this to return a 4xx / structured rejection rather than crashing.
@@ -167,13 +169,62 @@ export class DomainService {
     contractVersionId: ContractVersionId;
     sourceRevision: string;
     status: EvidenceStatus;
+    // Issue #16 metadata (all optional for backward compatibility).
+    kind?: EvidenceKind;
+    producer?: PrincipalRef;
+    environment?: string;
+    source?: string;
+    checksum?: string;
+    observedAt?: Date;
+    expiresAt?: Date;
+    consumerServiceId?: ServiceId;
+    provenance?: 'github-check' | 'direct-submission';
   }): Promise<AppendResult> {
     return this.#append('evidence', input.evidenceId, input.actor, input.correlationId, {
       type: 'EvidenceAttached',
       evidenceId: input.evidenceId,
       contractVersionId: input.contractVersionId,
       sourceRevision: input.sourceRevision,
-      status: input.status
+      status: input.status,
+      kind: input.kind,
+      producer: input.producer,
+      environment: input.environment,
+      source: input.source,
+      checksum: input.checksum,
+      observedAt: input.observedAt,
+      expiresAt: input.expiresAt,
+      consumerServiceId: input.consumerServiceId,
+      provenance: input.provenance
+    });
+  }
+
+  // Issue #16: a waiver is an authorized, expiring exception to one requirement;
+  // it is recorded as waiver evidence so the audit trail stays complete.
+  async grantWaiver(input: {
+    actor: PrincipalRef;
+    correlationId?: string;
+    evidenceId: EvidenceId;
+    contractVersionId: ContractVersionId;
+    sourceRevision: string;
+    waivedRequirementKind: EvidenceKind;
+    reason: string;
+    expiresAt: Date;
+  }): Promise<AppendResult> {
+    const guard = canGrantWaiver({ reason: input.reason, waivedRequirementKind: input.waivedRequirementKind, expiresAt: input.expiresAt, grantor: input.actor });
+    if (!guard.ok) {
+      throw new DomainRuleError(guard.reason);
+    }
+    return this.#append('evidence', input.evidenceId, input.actor, input.correlationId, {
+      type: 'EvidenceAttached',
+      evidenceId: input.evidenceId,
+      contractVersionId: input.contractVersionId,
+      sourceRevision: input.sourceRevision,
+      status: 'waived',
+      kind: 'waiver',
+      producer: input.actor,
+      source: input.reason,
+      expiresAt: input.expiresAt,
+      waivedKind: input.waivedRequirementKind
     });
   }
 

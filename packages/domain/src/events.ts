@@ -34,7 +34,7 @@ import type {
   TeamId,
   OrganizationId
 } from './primitives.js';
-import type { CompatibilityPolicy, ResolutionStatus, UsageDeclaration, WorkItemKind } from './model.js';
+import type { CompatibilityPolicy, EvidenceKind, ResolutionStatus, UsageDeclaration, WorkItemKind } from './model.js';
 import type { ImpactAnalysisSnapshot } from './impact.js';
 import type { ObservationKind } from './observation.js';
 
@@ -110,7 +110,7 @@ export type DomainEvent =
   | { type: 'DiscussionEntryResolved'; entryId: DiscussionEntryId; proposalId: ChangeProposalId; status: Exclude<ResolutionStatus, 'open'>; resolvedBy: PrincipalRef }
   | { type: 'DecisionRecorded'; decisionRecordId: DecisionRecordId; proposalId: ChangeProposalId; decision: string; rationale: string; constraints: ReadonlyArray<string>; rejectedAlternatives: ReadonlyArray<{ readonly alternative: string; readonly reason: string }>; approvers: ReadonlyArray<PrincipalRef>; validFrom: Date; validUntil?: Date | undefined; sourceEntryIds: ReadonlyArray<DiscussionEntryId>; supersedes?: DecisionRecordId | undefined }
   | { type: 'DecisionSuperseded'; originalDecisionRecordId: DecisionRecordId; supersedingDecisionRecordId: DecisionRecordId }
-  | { type: 'EvidenceAttached'; evidenceId: EvidenceId; contractVersionId: ContractVersionId; sourceRevision: string; status: EvidenceStatus }
+  | { type: 'EvidenceAttached'; evidenceId: EvidenceId; contractVersionId: ContractVersionId; sourceRevision: string; status: EvidenceStatus; kind?: EvidenceKind | undefined; producer?: PrincipalRef | undefined; environment?: string | undefined; source?: string | undefined; checksum?: string | undefined; observedAt?: Date | undefined; expiresAt?: Date | undefined; consumerServiceId?: ServiceId | undefined; provenance?: 'github-check' | 'direct-submission' | undefined; waivedKind?: EvidenceKind | undefined }
   | { type: 'DriftDetected'; observationId: ObservationId; operationId: OperationId; environment: string; kind: string; severity: DriftSeverity; sampleSize: number }
   | { type: 'PrincipalRegistered'; principalId: PrincipalId; kind: PrincipalKind; organizationId: OrganizationId; name: string; createdBy: PrincipalRef; status: 'active' | 'inactive' }
   | { type: 'PrincipalDeactivated'; principalId: PrincipalId; reason: string }
