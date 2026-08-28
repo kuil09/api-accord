@@ -35,6 +35,7 @@ import type {
   OrganizationId
 } from './primitives.js';
 import type { CompatibilityPolicy, ResolutionStatus, UsageDeclaration, WorkItemKind } from './model.js';
+import type { ImpactAnalysisSnapshot } from './impact.js';
 
 export type AggregateType =
   | 'organization'
@@ -98,6 +99,8 @@ export type DomainEvent =
   | { type: 'BlockingObjectionResolved'; proposalId: ChangeProposalId; entryId: DiscussionEntryId }
   | { type: 'ProposalWorkItemCreated'; proposalId: ChangeProposalId; workItemId: string; kind: WorkItemKind; description: string; assignedTo: PrincipalRef; at: Date }
   | { type: 'ProposalWorkItemCompleted'; proposalId: ChangeProposalId; workItemId: string; completedBy: PrincipalRef; at: Date }
+  | { type: 'ImpactAnalysisRecorded'; proposalId: ChangeProposalId; computedBy: PrincipalRef; computedAt: Date; snapshot: ImpactAnalysisSnapshot }
+  | { type: 'ImpactAnalysisAmended'; proposalId: ChangeProposalId; amendedBy: PrincipalRef; reason: string; evidence: string; at: Date }
   | { type: 'DiscussionEntryCreated'; entryId: DiscussionEntryId; proposalId: ChangeProposalId; kind: DiscussionEntryKind; author: PrincipalRef; body: string; isBlockingObjection: boolean; affectedConsumers: ReadonlyArray<ServiceId>; severity?: 'low' | 'medium' | 'high' | 'critical' | undefined; evidenceRef?: string | undefined; inReplyTo?: DiscussionEntryId | undefined; quotes?: DiscussionEntryId | undefined; duplicateOf?: DiscussionEntryId | undefined }
   | { type: 'DiscussionEntryResolved'; entryId: DiscussionEntryId; proposalId: ChangeProposalId; status: Exclude<ResolutionStatus, 'open'>; resolvedBy: PrincipalRef }
   | { type: 'DecisionRecorded'; decisionRecordId: DecisionRecordId; proposalId: ChangeProposalId; decision: string; rationale: string; constraints: ReadonlyArray<string>; rejectedAlternatives: ReadonlyArray<{ readonly alternative: string; readonly reason: string }>; approvers: ReadonlyArray<PrincipalRef>; validFrom: Date; validUntil?: Date | undefined; sourceEntryIds: ReadonlyArray<DiscussionEntryId>; supersedes?: DecisionRecordId | undefined }
@@ -178,6 +181,8 @@ export function aggregateOf(event: DomainEvent): { type: AggregateType; id: stri
       return { type: 'changeProposal', id: event.proposalId };
     case 'ProposalWorkItemCreated':
     case 'ProposalWorkItemCompleted':
+    case 'ImpactAnalysisRecorded':
+    case 'ImpactAnalysisAmended':
       return { type: 'changeProposal', id: event.proposalId };
     case 'DiscussionEntryCreated':
     case 'DiscussionEntryResolved':

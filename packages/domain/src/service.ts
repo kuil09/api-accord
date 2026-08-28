@@ -21,7 +21,9 @@ import type {
 } from './primitives.js';
 import type { ChangeProposalState } from './model.js';
 import type { AppendResult, AggregateType, EventStore } from './events.js';
-import { changeProposalState, consumerReadinessFrom, contextItemFrom, proposalApprovalsFrom, proposalWorkItemsFrom } from './projection.js';
+import { allDependencyEdges, changeProposalState, consumerReadinessFrom, contextItemFrom, proposalApprovalsFrom, proposalWorkItemsFrom } from './projection.js';
+import { canAmendImpactAnalysis, isImpactAnalysisStale } from './impact.js';
+import type { ImpactAnalysisSnapshot } from './impact.js';
 import {
   canAcceptProposal,
   canConfirmContext,
@@ -703,6 +705,55 @@ export class DomainService {
       proposalId: input.proposalId,
       workItemId: input.workItemId,
       completedBy: input.actor,
+      at: new Date()
+    });
+  }
+
+  // Issue #11: pins a computed impact analysis to the proposal. A snapshot whose
+  // inputs (dependency edges) changed since computation is rejected as stale --
+  // the caller recomputes instead of recording an outdated verdict.
+  async recordImpactAnalysis(input: {
+    actor: PrincipalRef;
+    correlationId?: string;
+    proposalId: ChangeProposalId;
+    snapshot: ImpactAnalysisSnapshot;
+  }): Promise<AppendResult> {
+    if (input.snapshot.computedBy.id !== input.actor.id) {
+      throw new DomainRuleError('issue #11: the snapshot must be recorded by its computing principal');
+    }
+    const all = await this.#store.getAll();
+    const staleness = isImpactAnalysisStale(input.snapshot, allDependencyEdges(all));
+    if (staleness.stale) {
+      throw new DomainRuleError('issue #11: impact analysis is stale and must be recomputed -- ' + staleness.reasons.join('; '));
+    }
+    return this.#append('changeProposal', input.proposalId, input.actor, input.correlationId, {
+      type: 'ImpactAnalysisRecorded',
+      proposalId: input.proposalId,
+      computedBy: input.snapshot.computedBy,
+      computedAt: input.snapshot.computedAt,
+      snapshot: input.snapshot
+    });
+  }
+
+  // INV-012: a human amendment is appended with reason and evidence; the
+  // computed analysis is never overwritten.
+  async amendImpactAnalysis(input: {
+    actor: PrincipalRef;
+    correlationId?: string;
+    proposalId: ChangeProposalId;
+    reason: string;
+    evidence: string;
+  }): Promise<AppendResult> {
+    const guard = canAmendImpactAnalysis({ reason: input.reason, evidence: input.evidence });
+    if (!guard.ok) {
+      throw new DomainRuleError(guard.reason);
+    }
+    return this.#append('changeProposal', input.proposalId, input.actor, input.correlationId, {
+      type: 'ImpactAnalysisAmended',
+      proposalId: input.proposalId,
+      amendedBy: input.actor,
+      reason: input.reason,
+      evidence: input.evidence,
       at: new Date()
     });
   }
