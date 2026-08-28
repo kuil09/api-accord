@@ -19,6 +19,7 @@ import type {
   DecisionRecordId,
   DependencyEdgeId,
   DiscussionEntryId,
+  DiscussionEntryKind,
   DriftSeverity,
   EvidenceId,
   EvidenceStatus,
@@ -33,7 +34,7 @@ import type {
   TeamId,
   OrganizationId
 } from './primitives.js';
-import type { CompatibilityPolicy, UsageDeclaration } from './model.js';
+import type { CompatibilityPolicy, ResolutionStatus, UsageDeclaration } from './model.js';
 
 export type AggregateType =
   | 'organization'
@@ -90,7 +91,9 @@ export type DomainEvent =
   | { type: 'ChangeProposalWithdrawn'; proposalId: ChangeProposalId }
   | { type: 'BlockingObjectionRaised'; proposalId: ChangeProposalId; entryId: DiscussionEntryId }
   | { type: 'BlockingObjectionResolved'; proposalId: ChangeProposalId; entryId: DiscussionEntryId }
-  | { type: 'DecisionRecorded'; decisionRecordId: DecisionRecordId; proposalId: ChangeProposalId; decision: string; rationale: string; approvers: ReadonlyArray<PrincipalRef> }
+  | { type: 'DiscussionEntryCreated'; entryId: DiscussionEntryId; proposalId: ChangeProposalId; kind: DiscussionEntryKind; author: PrincipalRef; body: string; isBlockingObjection: boolean; affectedConsumers: ReadonlyArray<ServiceId>; severity?: 'low' | 'medium' | 'high' | 'critical' | undefined; evidenceRef?: string | undefined; inReplyTo?: DiscussionEntryId | undefined; quotes?: DiscussionEntryId | undefined; duplicateOf?: DiscussionEntryId | undefined }
+  | { type: 'DiscussionEntryResolved'; entryId: DiscussionEntryId; proposalId: ChangeProposalId; status: Exclude<ResolutionStatus, 'open'>; resolvedBy: PrincipalRef }
+  | { type: 'DecisionRecorded'; decisionRecordId: DecisionRecordId; proposalId: ChangeProposalId; decision: string; rationale: string; constraints: ReadonlyArray<string>; rejectedAlternatives: ReadonlyArray<{ readonly alternative: string; readonly reason: string }>; approvers: ReadonlyArray<PrincipalRef>; validFrom: Date; validUntil?: Date | undefined; sourceEntryIds: ReadonlyArray<DiscussionEntryId>; supersedes?: DecisionRecordId | undefined }
   | { type: 'DecisionSuperseded'; originalDecisionRecordId: DecisionRecordId; supersedingDecisionRecordId: DecisionRecordId }
   | { type: 'EvidenceAttached'; evidenceId: EvidenceId; contractVersionId: ContractVersionId; sourceRevision: string; status: EvidenceStatus }
   | { type: 'DriftDetected'; observationId: ObservationId; operationId: OperationId; environment: string; kind: string; severity: DriftSeverity; sampleSize: number }
@@ -161,6 +164,9 @@ export function aggregateOf(event: DomainEvent): { type: AggregateType; id: stri
     case 'BlockingObjectionRaised':
     case 'BlockingObjectionResolved':
       return { type: 'changeProposal', id: event.proposalId };
+    case 'DiscussionEntryCreated':
+    case 'DiscussionEntryResolved':
+      return { type: 'discussionEntry', id: event.entryId };
     case 'DecisionRecorded':
       return { type: 'decisionRecord', id: event.decisionRecordId };
     case 'DecisionSuperseded':

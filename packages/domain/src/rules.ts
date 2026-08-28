@@ -90,3 +90,31 @@ export function canPublishContractVersion(
 export function areLifecycleStatesIndependent(state: ChangeProposalState): boolean {
   return state.accepted !== state.deployed && state.accepted !== state.observed;
 }
+
+// INV-013: a discussion summary is not a Decision Record. A decision is only
+// decidable once rationale, scope constraints, rejected alternatives, approvers
+// and a validity point are all fixed. INV-016: a human must approve — an AI
+// principal cannot record a decision on its own.
+export function canRecordDecision(input: {
+  readonly decision: string;
+  readonly rationale: string;
+  readonly approvers: ReadonlyArray<PrincipalRef>;
+  readonly validFrom: Date;
+}): GuardResult {
+  if (input.decision.trim().length === 0) {
+    return { ok: false, reason: 'INV-013: a decision record requires a decision statement' };
+  }
+  if (input.rationale.trim().length === 0) {
+    return { ok: false, reason: 'INV-013: a decision record requires a rationale' };
+  }
+  if (input.approvers.length === 0) {
+    return { ok: false, reason: 'INV-013: a decision record requires at least one approver' };
+  }
+  if (input.approvers.every((approver) => approver.kind !== 'human')) {
+    return { ok: false, reason: 'INV-016: a decision requires human approval; an AI principal cannot decide on its own' };
+  }
+  if (Number.isNaN(input.validFrom.getTime())) {
+    return { ok: false, reason: 'INV-013: a decision record requires a valid validFrom' };
+  }
+  return { ok: true };
+}

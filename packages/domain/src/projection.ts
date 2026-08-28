@@ -4,8 +4,8 @@
 // past — the original events remain and the derived state simply points at the
 // newer item.
 
-import type { ChangeProposalState, ContextItem, DependencyAssumption, DependencyEdge } from './model.js';
-import type { ChangeProposalId, Confidence, ContextItemId, ContextScope, DependencyEdgeId } from './primitives.js';
+import type { ChangeProposalState, ContextItem, DecisionRecord, DependencyAssumption, DependencyEdge, DiscussionEntry } from './model.js';
+import type { ChangeProposalId, Confidence, ContextItemId, ContextScope, DecisionRecordId, DependencyEdgeId, DiscussionEntryId } from './primitives.js';
 import type { DomainEvent, EventEnvelope } from './events.js';
 
 // Returns events whose occurrence is at or before `when`, enabling reconstruction
@@ -307,3 +307,103 @@ export function findConflictingAssumptions(
   return conflicts;
 }
 
+
+// Reconstructs a structured discussion entry (issue #8).
+export function discussionEntryFrom(
+  events: ReadonlyArray<EventEnvelope<DomainEvent>>,
+  entryId: DiscussionEntryId
+): DiscussionEntry | undefined {
+  const stream = events
+    .filter((envelope) => envelope.aggregateType === 'discussionEntry' && envelope.aggregateId === entryId)
+    .sort((left, right) => left.version - right.version);
+
+  let entry: DiscussionEntry | undefined;
+  for (const envelope of stream) {
+    const event = envelope.event;
+    if (event.type === 'DiscussionEntryCreated') {
+      entry = {
+        id: entryId,
+        proposalId: event.proposalId,
+        kind: event.kind,
+        author: event.author,
+        body: event.body,
+        isBlockingObjection: event.isBlockingObjection,
+        status: 'open',
+        affectedConsumers: event.affectedConsumers,
+        severity: event.severity,
+        evidenceRef: event.evidenceRef,
+        inReplyTo: event.inReplyTo,
+        quotes: event.quotes,
+        duplicateOf: event.duplicateOf
+      };
+    } else if (event.type === 'DiscussionEntryResolved' && entry !== undefined) {
+      entry = { ...entry, status: event.status };
+    }
+  }
+  return entry;
+}
+
+// Reconstructs a Decision Record with its full lineage (issue #8, INV-013).
+export function decisionRecordFrom(
+  events: ReadonlyArray<EventEnvelope<DomainEvent>>,
+  decisionRecordId: DecisionRecordId
+): DecisionRecord | undefined {
+  const stream = events
+    .filter((envelope) => envelope.aggregateType === 'decisionRecord' && envelope.aggregateId === decisionRecordId)
+    .sort((left, right) => left.version - right.version);
+
+  let record: DecisionRecord | undefined;
+  for (const envelope of stream) {
+    const event = envelope.event;
+    if (event.type === 'DecisionRecorded') {
+      record = {
+        id: decisionRecordId,
+        proposalId: event.proposalId,
+        decision: event.decision,
+        rationale: event.rationale,
+        constraints: event.constraints,
+        rejectedAlternatives: event.rejectedAlternatives,
+        approvers: event.approvers,
+        validFrom: event.validFrom,
+        validUntil: event.validUntil,
+        sourceEntryIds: event.sourceEntryIds,
+        supersedes: event.supersedes,
+        supersededBy: undefined
+      };
+    } else if (event.type === 'DecisionSuperseded' && record !== undefined) {
+      record = { ...record, supersededBy: event.supersedingDecisionRecordId };
+    }
+  }
+  return record;
+}
+
+export interface DiscussionSummary {
+  readonly entries: ReadonlyArray<DiscussionEntry>;
+  // INV-014: unresolved questions and blocking objections never disappear.
+  readonly unresolvedQuestions: ReadonlyArray<DiscussionEntry>;
+  readonly openBlockingObjections: ReadonlyArray<DiscussionEntry>;
+  readonly resolvedCount: number;
+  readonly wontFixCount: number;
+}
+
+// Builds a summary of a proposal's discussion, preserving unresolved items and
+// source links so a summary can never silently drop disagreement.
+export function discussionSummary(
+  events: ReadonlyArray<EventEnvelope<DomainEvent>>,
+  entryIds: ReadonlyArray<DiscussionEntryId>
+): DiscussionSummary {
+  const entries: DiscussionEntry[] = [];
+  for (const entryId of entryIds) {
+    const entry = discussionEntryFrom(events, entryId);
+    if (entry !== undefined) {
+      entries.push(entry);
+    }
+  }
+  return {
+    entries,
+    unresolvedQuestions: entries.filter((entry) => entry.kind === 'question' && entry.status === 'open'),
+    openBlockingObjections: entries.filter((entry) => entry.isBlockingObjection && entry.status === 'open'),
+    resolvedCount: entries.filter((entry) => entry.status === 'resolved').length,
+    wontFixCount: entries.filter((entry) => entry.status === 'wont-fix').length
+  };
+}
