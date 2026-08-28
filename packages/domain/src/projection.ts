@@ -4,8 +4,8 @@
 // past — the original events remain and the derived state simply points at the
 // newer item.
 
-import type { ChangeProposalState, ContextItem, DecisionRecord, DependencyAssumption, DependencyEdge, DiscussionEntry } from './model.js';
-import type { ChangeProposalId, Confidence, ContextItemId, ContextScope, DecisionRecordId, DependencyEdgeId, DiscussionEntryId } from './primitives.js';
+import type { ChangeProposalState, ContextItem, DecisionRecord, DependencyAssumption, DependencyEdge, DiscussionEntry, ProposalWorkItem } from './model.js';
+import type { ChangeProposalId, Confidence, ContextItemId, ContextScope, DecisionRecordId, DependencyEdgeId, DiscussionEntryId, PrincipalRef, ServiceId } from './primitives.js';
 import type { DomainEvent, EventEnvelope } from './events.js';
 
 // Returns events whose occurrence is at or before `when`, enabling reconstruction
@@ -406,4 +406,131 @@ export function discussionSummary(
     resolvedCount: entries.filter((entry) => entry.status === 'resolved').length,
     wontFixCount: entries.filter((entry) => entry.status === 'wont-fix').length
   };
+}
+
+export interface ProposalApprovals {
+  readonly requiredApprovers: ReadonlyArray<PrincipalRef>;
+  readonly givenApprovals: ReadonlyArray<PrincipalRef>;
+  // Required approvers who have not approved yet (never silently dropped).
+  readonly missingApprovers: ReadonlyArray<PrincipalRef>;
+  readonly satisfied: boolean;
+}
+
+// Computes the required-approver state from the ledger (issue #9). A recorded
+// approval whose approver has since withdrawn is not counted, so the requirement
+// stays honest rather than latching to an old approval.
+export function proposalApprovalsFrom(
+  events: ReadonlyArray<EventEnvelope<DomainEvent>>,
+  proposalId: ChangeProposalId
+): ProposalApprovals {
+  const stream = events
+    .filter((envelope) => envelope.aggregateType === 'changeProposal' && envelope.aggregateId === proposalId)
+    .sort((left, right) => left.version - right.version);
+
+  const required: PrincipalRef[] = [];
+  const given: PrincipalRef[] = [];
+  for (const envelope of stream) {
+    const event = envelope.event;
+    if (event.type === 'RequiredApproversDeclared') {
+      required.length = 0;
+      required.push(...event.requiredApprovers);
+    } else if (event.type === 'ApprovalRecorded') {
+      const existing = given.findIndex((approver) => approver.id === event.approver.id);
+      if (existing >= 0) {
+        given[existing] = event.approver;
+      } else {
+        given.push(event.approver);
+      }
+    } else if (event.type === 'ApprovalWithdrawn') {
+      const index = given.findIndex((approver) => approver.id === event.approver.id);
+      if (index >= 0) {
+        given.splice(index, 1);
+      }
+    }
+  }
+
+  const givenIds = new Set(given.map((approver) => approver.id));
+  const missing = required.filter((approver) => !givenIds.has(approver.id));
+  const satisfied = required.length > 0 && missing.length === 0;
+  return { requiredApprovers: required, givenApprovals: given, missingApprovers: missing, satisfied };
+}
+
+export interface ConsumerReadinessState {
+  readonly consumerServiceId: ServiceId;
+  readonly ready: boolean;
+  readonly deadline?: Date | undefined;
+  readonly evidenceRef?: string | undefined;
+  readonly acknowledged: boolean;
+}
+
+// Computes per-consumer readiness and migration deadlines (issue #9). Consumers
+// with no declaration are not silently treated as ready; they simply do not
+// appear here, so "unknown" stays distinguishable from "ready" (INV-009).
+export function consumerReadinessFrom(
+  events: ReadonlyArray<EventEnvelope<DomainEvent>>,
+  proposalId: ChangeProposalId
+): ReadonlyArray<ConsumerReadinessState> {
+  const stream = events
+    .filter((envelope) => envelope.aggregateType === 'changeProposal' && envelope.aggregateId === proposalId)
+    .sort((left, right) => left.version - right.version);
+
+  const states = new Map<string, ConsumerReadinessState>();
+  for (const envelope of stream) {
+    const event = envelope.event;
+    if (event.type === 'ConsumerReadinessDeclared') {
+      states.set(event.consumerServiceId, {
+        consumerServiceId: event.consumerServiceId,
+        ready: event.ready,
+        deadline: event.deadline,
+        evidenceRef: event.evidenceRef,
+        acknowledged: false
+      });
+    } else if (event.type === 'ConsumerMigrationAcknowledged') {
+      const current = states.get(event.consumerServiceId);
+      if (current !== undefined) {
+        states.set(event.consumerServiceId, { ...current, acknowledged: true });
+      } else {
+        states.set(event.consumerServiceId, {
+          consumerServiceId: event.consumerServiceId,
+          ready: false,
+          deadline: undefined,
+          evidenceRef: undefined,
+          acknowledged: true
+        });
+      }
+    }
+  }
+  return [...states.values()];
+}
+
+// Reconstructs the change work items of a proposal with their assignees and
+// completion state (issue #9).
+export function proposalWorkItemsFrom(
+  events: ReadonlyArray<EventEnvelope<DomainEvent>>,
+  proposalId: ChangeProposalId
+): ReadonlyArray<ProposalWorkItem> {
+  const stream = events
+    .filter((envelope) => envelope.aggregateType === 'changeProposal' && envelope.aggregateId === proposalId)
+    .sort((left, right) => left.version - right.version);
+
+  const items = new Map<string, ProposalWorkItem>();
+  for (const envelope of stream) {
+    const event = envelope.event;
+    if (event.type === 'ProposalWorkItemCreated') {
+      items.set(event.workItemId, {
+        id: event.workItemId,
+        kind: event.kind,
+        description: event.description,
+        assignedTo: event.assignedTo,
+        createdAt: event.at,
+        completedAt: undefined
+      });
+    } else if (event.type === 'ProposalWorkItemCompleted') {
+      const current = items.get(event.workItemId);
+      if (current !== undefined) {
+        items.set(event.workItemId, { ...current, completedAt: event.at });
+      }
+    }
+  }
+  return [...items.values()];
 }

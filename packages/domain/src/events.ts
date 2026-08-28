@@ -34,7 +34,7 @@ import type {
   TeamId,
   OrganizationId
 } from './primitives.js';
-import type { CompatibilityPolicy, ResolutionStatus, UsageDeclaration } from './model.js';
+import type { CompatibilityPolicy, ResolutionStatus, UsageDeclaration, WorkItemKind } from './model.js';
 
 export type AggregateType =
   | 'organization'
@@ -64,7 +64,7 @@ export type AggregateType =
 export type DomainEvent =
   | { type: 'ServiceRegistered'; serviceId: ServiceId; organizationId: OrganizationId; owningTeamId: TeamId; name: string; kind: 'provider' | 'consumer' | 'both' }
   | { type: 'ContractImported'; contractId: ApiContractId; organizationId: OrganizationId; providerServiceId: ServiceId; title: string }
-  | { type: 'ContractVersionPublished'; versionId: ContractVersionId; contractId: ApiContractId; sourceRevision: string; checksum: string; decisionRecordId?: DecisionRecordId }
+  | { type: 'ContractVersionPublished'; versionId: ContractVersionId; contractId: ApiContractId; sourceRevision: string; checksum: string; decisionRecordId?: DecisionRecordId; proposalId?: ChangeProposalId | undefined }
   | { type: 'OperationDeclared'; operationId: OperationId; contractId: ApiContractId; method: string; path: string; title: string }
   | { type: 'DependencyEdgeDeclared'; edgeId: DependencyEdgeId; consumerServiceId: ServiceId; operationId: OperationId; usage: UsageDeclaration; compatibility: CompatibilityPolicy; source: 'explicit' | 'code-analysis' | 'runtime-observation'; criticality: 'low' | 'medium' | 'high' | 'critical'; ownerTeamId?: TeamId | undefined }
   | { type: 'DependencyAssumptionAdded'; edgeId: DependencyEdgeId; assumptionId: string; statement: string; source: 'explicit' | 'code-analysis' | 'runtime-observation'; confidence: 'unverified' | 'inferred' | 'confirmed' | 'disputed'; conflictStatus: 'none' | 'conflicting' }
@@ -79,18 +79,25 @@ export type DomainEvent =
   | { type: 'ContextExpired'; contextItemId: ContextItemId; at: Date }
   | { type: 'ContextVisibilityChanged'; contextItemId: ContextItemId; visibility: 'public' | 'organization' | 'team' }
   | { type: 'ChangeProposalOpened'; proposalId: ChangeProposalId; contractId: ApiContractId; title: string }
-  | { type: 'ChangeProposalAccepted'; proposalId: ChangeProposalId }
-  | { type: 'ProviderImplementationRecorded'; proposalId: ChangeProposalId }
-  | { type: 'ConsumerReadinessRecorded'; proposalId: ChangeProposalId }
-  | { type: 'ContractVerificationRecorded'; proposalId: ChangeProposalId }
-  | { type: 'DeploymentRecorded'; proposalId: ChangeProposalId }
-  | { type: 'ObservationRecorded'; proposalId: ChangeProposalId }
-  | { type: 'ConsumerMigrationCompleted'; proposalId: ChangeProposalId }
+  | { type: 'ChangeProposalAccepted'; proposalId: ChangeProposalId; reason?: string | undefined }
+  | { type: 'ProviderImplementationRecorded'; proposalId: ChangeProposalId; reason?: string | undefined }
+  | { type: 'ConsumerReadinessRecorded'; proposalId: ChangeProposalId; reason?: string | undefined }
+  | { type: 'ContractVerificationRecorded'; proposalId: ChangeProposalId; reason?: string | undefined }
+  | { type: 'DeploymentRecorded'; proposalId: ChangeProposalId; reason?: string | undefined }
+  | { type: 'ObservationRecorded'; proposalId: ChangeProposalId; reason?: string | undefined }
+  | { type: 'ConsumerMigrationCompleted'; proposalId: ChangeProposalId; reason?: string | undefined }
+  | { type: 'RequiredApproversDeclared'; proposalId: ChangeProposalId; requiredApprovers: ReadonlyArray<PrincipalRef>; declaredBy: PrincipalRef }
+  | { type: 'ApprovalRecorded'; proposalId: ChangeProposalId; approver: PrincipalRef; comment?: string | undefined }
+  | { type: 'ApprovalWithdrawn'; proposalId: ChangeProposalId; approver: PrincipalRef; reason: string }
+  | { type: 'ConsumerReadinessDeclared'; proposalId: ChangeProposalId; consumerServiceId: ServiceId; ready: boolean; deadline?: Date | undefined; evidenceRef?: string | undefined; declaredBy: PrincipalRef }
+  | { type: 'ConsumerMigrationAcknowledged'; proposalId: ChangeProposalId; consumerServiceId: ServiceId; acknowledgedBy: PrincipalRef }
   | { type: 'ChangeProposalCompleted'; proposalId: ChangeProposalId }
-  | { type: 'ChangeProposalRejected'; proposalId: ChangeProposalId }
-  | { type: 'ChangeProposalWithdrawn'; proposalId: ChangeProposalId }
+  | { type: 'ChangeProposalRejected'; proposalId: ChangeProposalId; reason?: string | undefined }
+  | { type: 'ChangeProposalWithdrawn'; proposalId: ChangeProposalId; reason?: string | undefined }
   | { type: 'BlockingObjectionRaised'; proposalId: ChangeProposalId; entryId: DiscussionEntryId }
   | { type: 'BlockingObjectionResolved'; proposalId: ChangeProposalId; entryId: DiscussionEntryId }
+  | { type: 'ProposalWorkItemCreated'; proposalId: ChangeProposalId; workItemId: string; kind: WorkItemKind; description: string; assignedTo: PrincipalRef; at: Date }
+  | { type: 'ProposalWorkItemCompleted'; proposalId: ChangeProposalId; workItemId: string; completedBy: PrincipalRef; at: Date }
   | { type: 'DiscussionEntryCreated'; entryId: DiscussionEntryId; proposalId: ChangeProposalId; kind: DiscussionEntryKind; author: PrincipalRef; body: string; isBlockingObjection: boolean; affectedConsumers: ReadonlyArray<ServiceId>; severity?: 'low' | 'medium' | 'high' | 'critical' | undefined; evidenceRef?: string | undefined; inReplyTo?: DiscussionEntryId | undefined; quotes?: DiscussionEntryId | undefined; duplicateOf?: DiscussionEntryId | undefined }
   | { type: 'DiscussionEntryResolved'; entryId: DiscussionEntryId; proposalId: ChangeProposalId; status: Exclude<ResolutionStatus, 'open'>; resolvedBy: PrincipalRef }
   | { type: 'DecisionRecorded'; decisionRecordId: DecisionRecordId; proposalId: ChangeProposalId; decision: string; rationale: string; constraints: ReadonlyArray<string>; rejectedAlternatives: ReadonlyArray<{ readonly alternative: string; readonly reason: string }>; approvers: ReadonlyArray<PrincipalRef>; validFrom: Date; validUntil?: Date | undefined; sourceEntryIds: ReadonlyArray<DiscussionEntryId>; supersedes?: DecisionRecordId | undefined }
@@ -163,6 +170,14 @@ export function aggregateOf(event: DomainEvent): { type: AggregateType; id: stri
     case 'ChangeProposalWithdrawn':
     case 'BlockingObjectionRaised':
     case 'BlockingObjectionResolved':
+    case 'RequiredApproversDeclared':
+    case 'ApprovalRecorded':
+    case 'ApprovalWithdrawn':
+    case 'ConsumerReadinessDeclared':
+    case 'ConsumerMigrationAcknowledged':
+      return { type: 'changeProposal', id: event.proposalId };
+    case 'ProposalWorkItemCreated':
+    case 'ProposalWorkItemCompleted':
       return { type: 'changeProposal', id: event.proposalId };
     case 'DiscussionEntryCreated':
     case 'DiscussionEntryResolved':

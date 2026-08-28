@@ -91,6 +91,22 @@ export function areLifecycleStatesIndependent(state: ChangeProposalState): boole
   return state.accepted !== state.deployed && state.accepted !== state.observed;
 }
 
+// Issue #9 completion condition: without the required approvers all approving,
+// no contract version can be published. INV-001 additionally requires the
+// version to be published through an accepted proposal, never by direct edit.
+export function canPublishVersionForProposal(input: {
+  readonly proposalAccepted: boolean;
+  readonly approvalsSatisfied: boolean;
+}): GuardResult {
+  if (!input.proposalAccepted) {
+    return { ok: false, reason: 'INV-001: a contract version can only be published through an accepted change proposal' };
+  }
+  if (!input.approvalsSatisfied) {
+    return { ok: false, reason: 'INV-005: not all required approvers have approved; the contract version cannot be published' };
+  }
+  return { ok: true };
+}
+
 // INV-013: a discussion summary is not a Decision Record. A decision is only
 // decidable once rationale, scope constraints, rejected alternatives, approvers
 // and a validity point are all fixed. INV-016: a human must approve — an AI

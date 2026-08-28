@@ -21,14 +21,15 @@ import type {
 } from './primitives.js';
 import type { ChangeProposalState } from './model.js';
 import type { AppendResult, AggregateType, EventStore } from './events.js';
-import { changeProposalState, contextItemFrom } from './projection.js';
+import { changeProposalState, consumerReadinessFrom, contextItemFrom, proposalApprovalsFrom, proposalWorkItemsFrom } from './projection.js';
 import {
   canAcceptProposal,
   canConfirmContext,
   canCorrectContext,
   canMarkCompleted,
   canRecordDecision,
-  canPublishContractVersion
+  canPublishContractVersion,
+  canPublishVersionForProposal
 } from './rules.js';
 
 // Raised when a command is rejected by a domain guard. Callers (API/MCP/worker)
@@ -74,18 +75,25 @@ export class DomainService {
     correlationId?: string;
     proposalId: ChangeProposalId;
     openBlockingObjections: number;
-    requiredApproversSatisfied: boolean;
+    // When omitted, the requirement is computed from the recorded approvals in
+    // the ledger instead of trusting a caller-supplied flag.
+    requiredApproversSatisfied?: boolean;
+    reason?: string;
   }): Promise<AppendResult> {
+    const requiredApproversSatisfied =
+      input.requiredApproversSatisfied ??
+      (await this.#requiredApproversSatisfied(input.proposalId));
     const guard = canAcceptProposal({
       openBlockingObjections: input.openBlockingObjections,
-      requiredApproversSatisfied: input.requiredApproversSatisfied
+      requiredApproversSatisfied
     });
     if (!guard.ok) {
       throw new DomainRuleError(guard.reason);
     }
     return this.#append('changeProposal', input.proposalId, input.actor, input.correlationId, {
       type: 'ChangeProposalAccepted',
-      proposalId: input.proposalId
+      proposalId: input.proposalId,
+      ...(input.reason === undefined ? {} : { reason: input.reason })
     });
   }
 
@@ -93,10 +101,12 @@ export class DomainService {
     actor: PrincipalRef;
     correlationId?: string;
     proposalId: ChangeProposalId;
+    reason?: string;
   }): Promise<AppendResult> {
     return this.#append('changeProposal', input.proposalId, input.actor, input.correlationId, {
       type: 'ProviderImplementationRecorded',
-      proposalId: input.proposalId
+      proposalId: input.proposalId,
+      ...(input.reason === undefined ? {} : { reason: input.reason })
     });
   }
 
@@ -104,10 +114,12 @@ export class DomainService {
     actor: PrincipalRef;
     correlationId?: string;
     proposalId: ChangeProposalId;
+    reason?: string;
   }): Promise<AppendResult> {
     return this.#append('changeProposal', input.proposalId, input.actor, input.correlationId, {
       type: 'ConsumerReadinessRecorded',
-      proposalId: input.proposalId
+      proposalId: input.proposalId,
+      ...(input.reason === undefined ? {} : { reason: input.reason })
     });
   }
 
@@ -115,10 +127,12 @@ export class DomainService {
     actor: PrincipalRef;
     correlationId?: string;
     proposalId: ChangeProposalId;
+    reason?: string;
   }): Promise<AppendResult> {
     return this.#append('changeProposal', input.proposalId, input.actor, input.correlationId, {
       type: 'ContractVerificationRecorded',
-      proposalId: input.proposalId
+      proposalId: input.proposalId,
+      ...(input.reason === undefined ? {} : { reason: input.reason })
     });
   }
 
@@ -126,10 +140,12 @@ export class DomainService {
     actor: PrincipalRef;
     correlationId?: string;
     proposalId: ChangeProposalId;
+    reason?: string;
   }): Promise<AppendResult> {
     return this.#append('changeProposal', input.proposalId, input.actor, input.correlationId, {
       type: 'DeploymentRecorded',
-      proposalId: input.proposalId
+      proposalId: input.proposalId,
+      ...(input.reason === undefined ? {} : { reason: input.reason })
     });
   }
 
@@ -137,10 +153,12 @@ export class DomainService {
     actor: PrincipalRef;
     correlationId?: string;
     proposalId: ChangeProposalId;
+    reason?: string;
   }): Promise<AppendResult> {
     return this.#append('changeProposal', input.proposalId, input.actor, input.correlationId, {
       type: 'ObservationRecorded',
-      proposalId: input.proposalId
+      proposalId: input.proposalId,
+      ...(input.reason === undefined ? {} : { reason: input.reason })
     });
   }
 
@@ -150,10 +168,12 @@ export class DomainService {
     actor: PrincipalRef;
     correlationId?: string;
     proposalId: ChangeProposalId;
+    reason?: string;
   }): Promise<AppendResult> {
     return this.#append('changeProposal', input.proposalId, input.actor, input.correlationId, {
       type: 'ConsumerMigrationCompleted',
-      proposalId: input.proposalId
+      proposalId: input.proposalId,
+      ...(input.reason === undefined ? {} : { reason: input.reason })
     });
   }
 
@@ -169,6 +189,18 @@ export class DomainService {
     if (!guard.ok) {
       throw new DomainRuleError(guard.reason);
     }
+    // Issue #9: completion waits for every assigned change work item to finish.
+    const all = await this.#store.getAll();
+    const outstanding = proposalWorkItemsFrom(all, input.proposalId).filter((item) => item.completedAt === undefined);
+    if (outstanding.length > 0) {
+      throw new DomainRuleError(`issue #9: ${String(outstanding.length)} change work item(s) are still outstanding`);
+    }
+    // Issue #9 + INV-006: a consumer that declared itself not ready blocks
+    // completion; "unknown" consumers simply do not appear in the projection.
+    const notReady = consumerReadinessFrom(all, input.proposalId).filter((entry) => !entry.ready);
+    if (notReady.length > 0) {
+      throw new DomainRuleError(`INV-006: consumers not ready for migration: ${notReady.map((entry) => entry.consumerServiceId).join(', ')}`);
+    }
     return this.#append('changeProposal', input.proposalId, input.actor, input.correlationId, {
       type: 'ChangeProposalCompleted',
       proposalId: input.proposalId
@@ -179,10 +211,12 @@ export class DomainService {
     actor: PrincipalRef;
     correlationId?: string;
     proposalId: ChangeProposalId;
+    reason?: string;
   }): Promise<AppendResult> {
     return this.#append('changeProposal', input.proposalId, input.actor, input.correlationId, {
       type: 'ChangeProposalRejected',
-      proposalId: input.proposalId
+      proposalId: input.proposalId,
+      ...(input.reason === undefined ? {} : { reason: input.reason })
     });
   }
 
@@ -190,10 +224,12 @@ export class DomainService {
     actor: PrincipalRef;
     correlationId?: string;
     proposalId: ChangeProposalId;
+    reason?: string;
   }): Promise<AppendResult> {
     return this.#append('changeProposal', input.proposalId, input.actor, input.correlationId, {
       type: 'ChangeProposalWithdrawn',
-      proposalId: input.proposalId
+      proposalId: input.proposalId,
+      ...(input.reason === undefined ? {} : { reason: input.reason })
     });
   }
 
@@ -253,11 +289,22 @@ export class DomainService {
     sourceRevision: string;
     checksum: string;
     decisionRecordId?: DecisionRecordId;
+    // When provided, the ledger's recorded approvals are verified (INV-005)
+    // before the version is published.
+    proposalId?: ChangeProposalId;
   }): Promise<AppendResult> {
     const existing = await this.#publishedVersionIds();
     const guard = canPublishContractVersion(existing, input.versionId);
     if (!guard.ok) {
       throw new DomainRuleError(guard.reason);
+    }
+    if (input.proposalId !== undefined) {
+      const state = await this.#proposalState(input.proposalId);
+      const approvals = await this.#requiredApproversSatisfied(input.proposalId);
+      const publishGuard = canPublishVersionForProposal({ proposalAccepted: state.accepted, approvalsSatisfied: approvals });
+      if (!publishGuard.ok) {
+        throw new DomainRuleError(publishGuard.reason);
+      }
     }
     const event: Parameters<EventStore['append']>[0]['event'] =
       input.decisionRecordId === undefined
@@ -520,6 +567,143 @@ export class DomainService {
       type: 'DecisionSuperseded',
       originalDecisionRecordId: input.originalDecisionRecordId,
       supersedingDecisionRecordId: input.supersedingDecisionRecordId
+    });
+  }
+
+  // ---- Required approvers (issue #9) ----
+
+  async declareRequiredApprovers(input: {
+    actor: PrincipalRef;
+    correlationId?: string;
+    proposalId: ChangeProposalId;
+    requiredApprovers: ReadonlyArray<PrincipalRef>;
+  }): Promise<AppendResult> {
+    if (input.requiredApprovers.length === 0) {
+      throw new DomainRuleError('INV-005: the required approver list must not be empty');
+    }
+    return this.#append('changeProposal', input.proposalId, input.actor, input.correlationId, {
+      type: 'RequiredApproversDeclared',
+      proposalId: input.proposalId,
+      requiredApprovers: input.requiredApprovers,
+      declaredBy: input.actor
+    });
+  }
+
+  async recordApproval(input: {
+    actor: PrincipalRef;
+    correlationId?: string;
+    proposalId: ChangeProposalId;
+    comment?: string;
+  }): Promise<AppendResult> {
+    return this.#append('changeProposal', input.proposalId, input.actor, input.correlationId, {
+      type: 'ApprovalRecorded',
+      proposalId: input.proposalId,
+      approver: input.actor,
+      comment: input.comment
+    });
+  }
+
+  async withdrawApproval(input: {
+    actor: PrincipalRef;
+    correlationId?: string;
+    proposalId: ChangeProposalId;
+    reason: string;
+  }): Promise<AppendResult> {
+    return this.#append('changeProposal', input.proposalId, input.actor, input.correlationId, {
+      type: 'ApprovalWithdrawn',
+      proposalId: input.proposalId,
+      approver: input.actor,
+      reason: input.reason
+    });
+  }
+
+  // ---- Per-consumer readiness and migration deadline (issue #9) ----
+
+  async declareConsumerReadiness(input: {
+    actor: PrincipalRef;
+    correlationId?: string;
+    proposalId: ChangeProposalId;
+    consumerServiceId: ServiceId;
+    ready: boolean;
+    deadline?: Date;
+    evidenceRef?: string;
+  }): Promise<AppendResult> {
+    return this.#append('changeProposal', input.proposalId, input.actor, input.correlationId, {
+      type: 'ConsumerReadinessDeclared',
+      proposalId: input.proposalId,
+      consumerServiceId: input.consumerServiceId,
+      ready: input.ready,
+      deadline: input.deadline,
+      evidenceRef: input.evidenceRef,
+      declaredBy: input.actor
+    });
+  }
+
+  async acknowledgeConsumerMigration(input: {
+    actor: PrincipalRef;
+    correlationId?: string;
+    proposalId: ChangeProposalId;
+    consumerServiceId: ServiceId;
+  }): Promise<AppendResult> {
+    return this.#append('changeProposal', input.proposalId, input.actor, input.correlationId, {
+      type: 'ConsumerMigrationAcknowledged',
+      proposalId: input.proposalId,
+      consumerServiceId: input.consumerServiceId,
+      acknowledgedBy: input.actor
+    });
+  }
+
+  // Computes the approver requirement from the ledger instead of a caller flag.
+  async #requiredApproversSatisfied(proposalId: ChangeProposalId): Promise<boolean> {
+    const all = await this.#store.getAll();
+    return proposalApprovalsFrom(all, proposalId).satisfied;
+  }
+
+  // Issue #9: a change work item with an assigned principal. Outstanding work
+  // items block proposal completion.
+  async createWorkItem(input: {
+    actor: PrincipalRef;
+    correlationId?: string;
+    proposalId: ChangeProposalId;
+    workItemId: string;
+    kind: 'implementation' | 'test' | 'deployment' | 'migration';
+    description: string;
+    assignedTo: PrincipalRef;
+  }): Promise<AppendResult> {
+    if (input.description.trim().length === 0) {
+      throw new DomainRuleError('issue #9: a work item requires a description');
+    }
+    return this.#append('changeProposal', input.proposalId, input.actor, input.correlationId, {
+      type: 'ProposalWorkItemCreated',
+      proposalId: input.proposalId,
+      workItemId: input.workItemId,
+      kind: input.kind,
+      description: input.description,
+      assignedTo: input.assignedTo,
+      at: new Date()
+    });
+  }
+
+  async completeWorkItem(input: {
+    actor: PrincipalRef;
+    correlationId?: string;
+    proposalId: ChangeProposalId;
+    workItemId: string;
+  }): Promise<AppendResult> {
+    const all = await this.#store.getAll();
+    const item = proposalWorkItemsFrom(all, input.proposalId).find((candidate) => candidate.id === input.workItemId);
+    if (item === undefined) {
+      throw new DomainRuleError(`issue #9: work item '${input.workItemId}' does not exist on this proposal`);
+    }
+    if (item.completedAt !== undefined) {
+      throw new DomainRuleError(`issue #9: work item '${input.workItemId}' is already completed`);
+    }
+    return this.#append('changeProposal', input.proposalId, input.actor, input.correlationId, {
+      type: 'ProposalWorkItemCompleted',
+      proposalId: input.proposalId,
+      workItemId: input.workItemId,
+      completedBy: input.actor,
+      at: new Date()
     });
   }
 }
