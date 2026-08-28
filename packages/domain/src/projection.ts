@@ -5,7 +5,7 @@
 // newer item.
 
 import type { ChangeProposalState, ContextItem, DependencyAssumption, DependencyEdge } from './model.js';
-import type { ChangeProposalId, ContextItemId, DependencyEdgeId } from './primitives.js';
+import type { ChangeProposalId, Confidence, ContextItemId, ContextScope, DependencyEdgeId } from './primitives.js';
 import type { DomainEvent, EventEnvelope } from './events.js';
 
 // Returns events whose occurrence is at or before `when`, enabling reconstruction
@@ -116,6 +116,7 @@ export function changeProposalState(
 
 // Resolves the "current" context item by replaying corrections/supersedes. The
 // original events are untouched; only the derived pointer moves (INV-012).
+
 export function contextItemFrom(
   events: ReadonlyArray<EventEnvelope<DomainEvent>>,
   contextItemId: ContextItemId
@@ -136,19 +137,100 @@ export function contextItemFrom(
         author: event.author,
         source: event.source,
         confidence: event.confidence,
-        validFrom: new Date(0)
+        validFrom: new Date(0),
+        visibility: 'organization',
+        disputed: false
       };
     } else if (event.type === 'ContextConfirmed' && item !== undefined) {
       item = { ...item, confidence: 'confirmed', validFrom: event.validFrom };
     } else if (event.type === 'ContextCorrected' && item !== undefined) {
-      item = { ...item, correctedBy: event.correctionContextItemId };
+      item = { ...item, correctedBy: event.correctionContextItemId, correctedAt: envelope.occurredAt };
     } else if (event.type === 'ContextSuperseded' && item !== undefined) {
       item = { ...item, supersededBy: event.supersedingContextItemId };
+    } else if (event.type === 'ContextChallenged' && item !== undefined) {
+      item = { ...item, disputed: true, challengedBy: event.challenger };
+    } else if (event.type === 'ContextNarrowedScope' && item !== undefined) {
+      item = { ...item, scope: event.scope };
+    } else if (event.type === 'ContextEvidenceAdded' && item !== undefined) {
+      item = { ...item, evidenceRef: event.evidenceRef };
+    } else if (event.type === 'ContextExpired' && item !== undefined) {
+      item = { ...item, validUntil: event.at };
+    } else if (event.type === 'ContextVisibilityChanged' && item !== undefined) {
+      item = { ...item, visibility: event.visibility };
     }
   }
 
   return item;
 }
+
+// Detects contradictory context items in the same scope (never averaged away).
+// Returns the conflicting pair ids and their scopes. Semantic conflict detection
+// is later (#18); this is a keyword-based first pass.
+export function detectContextConflicts(
+  items: ReadonlyArray<ContextItem>
+): ReadonlyArray<readonly [ContextItemId, ContextItemId]> {
+  const conflicts: Array<readonly [ContextItemId, ContextItemId]> = [];
+  for (let i = 0; i < items.length; i += 1) {
+    for (let j = i + 1; j < items.length; j += 1) {
+      const a = items[i];
+      const b = items[j];
+      if (a === undefined || b === undefined) continue;
+      if (a.scope !== b.scope) continue;
+      const sameStatement = normalize(a.statement) === normalize(b.statement);
+      if (!sameStatement && contradicts(a.statement, b.statement)) {
+        conflicts.push([a.id, b.id]);
+      }
+    }
+  }
+  return conflicts;
+}
+
+export interface ContextQuery {
+  readonly scope?: ContextScope;
+  readonly confidence?: Confidence;
+  readonly visibility?: 'public' | 'organization' | 'team';
+  readonly includeExpired?: boolean;
+  readonly includeConfirmedOnly?: boolean;
+  readonly includeDisputedOnly?: boolean;
+}
+
+// Filters context items by structured criteria (issue #7 query surface).
+export function queryContext(
+  items: ReadonlyArray<ContextItem>,
+  query: ContextQuery,
+  now: Date = new Date()
+): ReadonlyArray<ContextItem> {
+  return items.filter((item) => {
+    if (query.scope !== undefined && item.scope !== query.scope) return false;
+    if (query.confidence !== undefined && item.confidence !== query.confidence) return false;
+    if (query.visibility !== undefined && item.visibility !== query.visibility) return false;
+    if (query.includeConfirmedOnly === true && item.confidence !== 'confirmed') return false;
+    if (query.includeDisputedOnly === true && item.disputed !== true) return false;
+    if (query.includeExpired === false || query.includeExpired === undefined) {
+      if (item.validUntil !== undefined && item.validUntil.getTime() < now.getTime()) return false;
+    }
+    return true;
+  });
+}
+
+function normalize(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]/gu, '');
+}
+
+function contradicts(statementA: string, statementB: string): boolean {
+  const pa = polarity(statementA);
+  const pb = polarity(statementB);
+  if (pa === 0 || pb === 0) return false;
+  return pa + pb === 0;
+}
+
+function polarity(text: string): 1 | -1 | 0 {
+  const t = text.toLowerCase();
+  if (/not|never|does not|doesn't|isn't|aren't|without/u.test(t)) return -1;
+  if (/always|must|is|exists|requires|guarantees/u.test(t)) return 1;
+  return 0;
+}
+
 
 // Reconstructs a DependencyEdge from its event stream (issue #6). Assumptions
 // from different consumers/sources are preserved rather than averaged; when two
@@ -225,18 +307,3 @@ export function findConflictingAssumptions(
   return conflicts;
 }
 
-// A simple keyword-based contradiction check; real semantic conflict detection
-// is later (#18). This keeps opposing assumptions visible rather than merged.
-function contradicts(statementA: string, statementB: string): boolean {
-  const normalizedA = statementA.toLowerCase();
-  const normalizedB = statementB.toLowerCase();
-  const polarity = (text: string): 1 | -1 | 0 => {
-    if (/(always|must|exists|is)/u.test(text) && /not/u.test(text)) return -1;
-    if (/(always|must|exists|is)/u.test(text)) return 1;
-    return 0;
-  };
-  const pa = polarity(normalizedA);
-  const pb = polarity(normalizedB);
-  if (pa === 0 || pb === 0) return false;
-  return pa + pb === 0;
-}

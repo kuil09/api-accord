@@ -152,6 +152,12 @@ export interface ContextItem {
   // INV-012: corrections and supersedes leave a new item and reference it here.
   readonly correctedBy?: ContextItemId;
   readonly supersededBy?: ContextItemId;
+  readonly visibility: 'public' | 'organization' | 'team';
+  readonly evidenceRef?: string;
+  readonly supersedes?: ContextItemId;
+  readonly correctedAt?: Date;
+  readonly challengedBy?: PrincipalRef;
+  readonly disputed: boolean;
 }
 
 export interface DiscussionEntry {

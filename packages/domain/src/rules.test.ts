@@ -73,6 +73,8 @@ describe('domain rules', () => {
       author: principalRef('human', 'a'),
       source: 'doc',
       confidence: 'confirmed',
+      visibility: 'organization',
+      disputed: false,
       validFrom: new Date()
     };
     assert.equal(canCorrectContext(clean).ok, true);

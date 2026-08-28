@@ -12,6 +12,7 @@ import type {
   ApiContractId,
   ChangeProposalId,
   ContextItemId,
+  ContextScope,
   ContractVersionId,
   DecisionRecordId,
   PrincipalRef
@@ -316,5 +317,73 @@ export class DomainService {
     return all
       .filter((envelope) => envelope.event.type === 'ContractVersionPublished')
       .map((envelope) => (envelope.event as { versionId: ContractVersionId }).versionId);
+  }
+
+  async challengeContext(input: {
+    actor: PrincipalRef;
+    correlationId?: string;
+    contextItemId: ContextItemId;
+    reason: string;
+  }): Promise<AppendResult> {
+    return this.#append('contextItem', input.contextItemId, input.actor, input.correlationId, {
+      type: 'ContextChallenged',
+      contextItemId: input.contextItemId,
+      challenger: input.actor,
+      reason: input.reason
+    });
+  }
+
+  async narrowContextScope(input: {
+    actor: PrincipalRef;
+    correlationId?: string;
+    contextItemId: ContextItemId;
+    scope: ContextScope;
+    previousScope: ContextScope;
+  }): Promise<AppendResult> {
+    return this.#append('contextItem', input.contextItemId, input.actor, input.correlationId, {
+      type: 'ContextNarrowedScope',
+      contextItemId: input.contextItemId,
+      scope: input.scope,
+      previousScope: input.previousScope
+    });
+  }
+
+  async addContextEvidence(input: {
+    actor: PrincipalRef;
+    correlationId?: string;
+    contextItemId: ContextItemId;
+    evidenceRef: string;
+  }): Promise<AppendResult> {
+    return this.#append('contextItem', input.contextItemId, input.actor, input.correlationId, {
+      type: 'ContextEvidenceAdded',
+      contextItemId: input.contextItemId,
+      evidenceRef: input.evidenceRef
+    });
+  }
+
+  async expireContext(input: {
+    actor: PrincipalRef;
+    correlationId?: string;
+    contextItemId: ContextItemId;
+    at: Date;
+  }): Promise<AppendResult> {
+    return this.#append('contextItem', input.contextItemId, input.actor, input.correlationId, {
+      type: 'ContextExpired',
+      contextItemId: input.contextItemId,
+      at: input.at
+    });
+  }
+
+  async changeContextVisibility(input: {
+    actor: PrincipalRef;
+    correlationId?: string;
+    contextItemId: ContextItemId;
+    visibility: 'public' | 'organization' | 'team';
+  }): Promise<AppendResult> {
+    return this.#append('contextItem', input.contextItemId, input.actor, input.correlationId, {
+      type: 'ContextVisibilityChanged',
+      contextItemId: input.contextItemId,
+      visibility: input.visibility
+    });
   }
 }
