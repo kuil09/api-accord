@@ -17,6 +17,7 @@
     "build": "tsc -b",
     "check": "npm run lint && npm run typecheck && npm run build && npm run test && npm run db:validate",
     "clean": "node scripts/clean.mjs",
+    "demo:ui": "npm run build && node scripts/demo-ui.mjs",
     "db:migrate": "node scripts/migrate.mjs up",
     "db:rollback": "node scripts/migrate.mjs down",
     "db:validate": "node scripts/validate-migrations.mjs",

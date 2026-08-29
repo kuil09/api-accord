@@ -98,3 +98,122 @@ footer {
     grid-template-columns: 1fr;
   }
 }
+
+/* UI application components (issue #20) */
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 0;
+  border-bottom: 2px solid #171915;
+  margin-bottom: 32px;
+}
+
+.nav-brand {
+  font-weight: 800;
+  text-decoration: none;
+  color: #171915;
+  font-size: 1.1rem;
+}
+
+.nav-links {
+  display: flex;
+  gap: 20px;
+}
+
+.nav-links a {
+  color: #171915;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.nav-links a:hover {
+  text-decoration: underline;
+}
+
+.page-title {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 2.2rem;
+  font-weight: 600;
+  margin: 0 0 24px;
+}
+
+.section-box {
+  background: #ffffff;
+  border: 1px solid #171915;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 4px 4px 0 #171915;
+}
+
+.section-box h2 {
+  margin-top: 0;
+  font-size: 1.2rem;
+  border-bottom: 1px solid #e0ded8;
+  padding-bottom: 8px;
+}
+
+ul.data-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+ul.data-list li {
+  padding: 10px 0;
+  border-bottom: 1px solid #f0eee8;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+ul.data-list li:last-child {
+  border-bottom: none;
+}
+
+ul.data-list li.empty {
+  color: #777;
+  font-style: italic;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  border: 1px solid #171915;
+  border-radius: 3px;
+  background: #e8e5dc;
+}
+
+.badge-human {
+  background: #d1fae5;
+  color: #065f46;
+  border-color: #059669;
+}
+
+.badge-ai {
+  background: #ede9fe;
+  color: #5b21b6;
+  border-color: #7c3aed;
+}
+
+.badge-blocking {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #dc2626;
+}
+
+.badge-provider {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.badge-consumer {
+  background: #fef3c7;
+  color: #92400e;
+}
+
