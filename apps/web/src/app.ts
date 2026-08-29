@@ -23,9 +23,11 @@ export interface WebApplication {
 }
 
 const DEFAULT_PUBLIC_DIRECTORY = fileURLToPath(new URL('../public/', import.meta.url));
+// Static assets that are served directly (compiled CSS, JS, images)
 const STATIC_PATHS: Readonly<Record<string, string>> = {
-  '/': 'index.html',
-  '/styles.css': 'styles.css'
+  '/styles.css': 'styles.css',
+  '/app.js': 'app.js',
+  '/favicon.ico': 'favicon.ico'
 };
 
 export function createWebApplication(options: WebApplicationOptions): WebApplication {
