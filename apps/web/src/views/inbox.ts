@@ -1,13 +1,8 @@
 // Action Inbox screen renderer
 
-import { htmlPage } from './layout.js';
+import { htmlPage, escapeHtml } from './layout.js';
 import {
-  sectionBox,
-  card,
-  renderList,
-  tabs,
-  Badge,
-  emptyState
+  tabs
 } from './components.js';
 
 export interface InboxData {
@@ -111,8 +106,4 @@ export function renderInbox(data: InboxData, orgId?: string): string {
 </div>`;
 
   return htmlPage('Action Inbox', content, orgId);
-}
-
-function escapeHtml(text: string): string {
-  return text.replace(/&/gu, '&').replace(/</gu, '<').replace(/>/gu, '>').replace(/"/gu, '"');
 }

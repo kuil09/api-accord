@@ -73,7 +73,7 @@ export interface ColumnDef<T> {
 
 export function renderTable<T>(
   columns: ColumnDef<T>[],
-  rows: T[],
+  rows: ReadonlyArray<T>,
   options?: { emptyMessage?: string; orgId?: string }
 ): string {
   if (rows.length === 0) {
@@ -149,12 +149,12 @@ export interface TimelineStep {
   detail?: string;
 }
 
-export function timeline(steps: TimelineStep[]): string {
+export function timeline(steps: ReadonlyArray<TimelineStep>): string {
   return `
 <div class="timeline">
   ${steps
     .map(
-      (step, i) => `
+      (step) => `
     <div class="timeline-step ${step.status}">
       <div class="timeline-marker" aria-hidden="true"></div>
       <div class="timeline-content">
@@ -206,10 +206,10 @@ export interface TabItem {
   label: string;
   content: string;
   count?: number;
-  badgeVariant?: 'default' | 'blocking' | 'warning';
+  badgeVariant?: string;
 }
 
-export function tabs(items: TabItem[], activeId?: string): string {
+export function tabs(items: ReadonlyArray<TabItem>, activeId?: string): string {
   const firstActive = activeId ?? items[0]?.id;
   return `
 <div class="tabs" role="tablist">
@@ -253,7 +253,7 @@ export function tabs(items: TabItem[], activeId?: string): string {
 // ============================================================================
 
 export function renderList(
-  items: Array<{ label: string; badges?: string[]; href?: string; detail?: string }>,
+  items: ReadonlyArray<{ label: string; badges?: string[]; href?: string; detail?: string }>,
   emptyMessage = 'none'
 ): string {
   if (items.length === 0) {
@@ -318,7 +318,7 @@ export function emptyState(message: string, action?: { label: string; href: stri
 }
 
 // ============================================================================
-// Detail/Summary (for collapsible sections)
+// Details/Summary (for collapsible sections)
 // ============================================================================
 
 export function details(summary: string, content: string, open = false): string {

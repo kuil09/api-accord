@@ -1,8 +1,8 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
-    './src/**/*.ts',
-    './public/**/*.html'
+    '../apps/web/src/**/*.ts',
+    '../apps/web/public/**/*.html'
   ],
   theme: {
     extend: {
@@ -37,9 +37,5 @@ export default {
   plugins: [],
   safelist: [
     { pattern: /badge-/ },
-    { pattern: /confidence-/ },
-    { pattern: /toast-/ },
-    { pattern: /phase-step/ },
-    { pattern: /timeline-step/ },
   ]
 };

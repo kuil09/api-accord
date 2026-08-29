@@ -1,16 +1,13 @@
 // Workspace screen renderer
 
-import { htmlPage } from './layout.js';
+import { htmlPage, escapeHtml } from './layout.js';
 import {
-  sectionBox,
   renderTable,
-  renderList,
   card,
   Badge,
   emptyState,
   phaseProgress
 } from './components.js';
-import type { ChangeProposalState } from '@api-accord/domain';
 
 export interface WorkspaceData {
   readonly services: ReadonlyArray<{ readonly serviceId: string; readonly name: string; readonly kind: string }>;
@@ -111,8 +108,4 @@ export function renderWorkspace(data: WorkspaceData, orgId?: string): string {
 </div>`;
 
   return htmlPage('API Workspace', content, orgId);
-}
-
-function escapeHtml(text: string): string {
-  return text.replace(/&/gu, '&').replace(/</gu, '<').replace(/>/gu, '>').replace(/"/gu, '"');
 }

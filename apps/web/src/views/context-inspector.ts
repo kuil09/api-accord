@@ -1,20 +1,13 @@
 // Context Inspector screen renderer
 
-import { htmlPage } from './layout.js';
+import { htmlPage, escapeHtml } from './layout.js';
 import {
-  sectionBox,
   tabs,
-  Badge,
-  card,
-  emptyState,
-  renderList,
-  details
+  Badge
 } from './components.js';
 import type { ContextBundle } from '@api-accord/domain';
 
 export function renderContextInspector(bundle: ContextBundle, orgId?: string): string {
-  const orgParam = orgId ? `?organizationId=${encodeURIComponent(orgId)}` : '';
-
   function renderClaims(claims: ReadonlyArray<{
     readonly statement: string;
     readonly author?: { readonly kind: string } | undefined;
@@ -63,31 +56,31 @@ export function renderContextInspector(bundle: ContextBundle, orgId?: string): s
     bundle.sections.conflicts.length > 0
       ? bundle.sections.conflicts
           .map(
-            (c) => card({
-              title: 'Conflict',
-              content: `
-<div class="conflict-pair">
-  <div class="conflict-side">
-    <h4>Claim A</h4>
-    <p>${escapeHtml(c.claimA.statement)}</p>
-    <div class="claim-meta">
-      ${authorBadge(c.claimA.author?.kind)}
-      <span class="claim-confidence confidence-${escapeHtml(c.claimA.confidence.toLowerCase())}">${escapeHtml(c.claimA.confidence)}</span>
+            (c) => `
+<div class="conflict-card">
+  <div class="conflict-pair">
+    <div class="conflict-side">
+      <h4>Claim A</h4>
+      <p>${escapeHtml(c.claimA.statement)}</p>
+      <div class="claim-meta">
+        ${authorBadge(c.claimA.author?.kind)}
+        <span class="claim-confidence confidence-${escapeHtml(c.claimA.confidence.toLowerCase())}">${escapeHtml(c.claimA.confidence)}</span>
+      </div>
+      <code>${escapeHtml(c.claimA.sourceRef ?? 'No source')}</code>
     </div>
-    <code>${escapeHtml(c.claimA.sourceRef ?? 'No source')}</code>
-  </div>
-  <div class="conflict-divider" aria-hidden="true">↔</div>
-  <div class="conflict-side">
-    <h4>Claim B</h4>
-    <p>${escapeHtml(c.claimB.statement)}</p>
-    <div class="claim-meta">
-      ${authorBadge(c.claimB.author?.kind)}
-      <span class="claim-confidence confidence-${escapeHtml(c.claimB.confidence.toLowerCase())}">${escapeHtml(c.claimB.confidence)}</span>
+    <div class="conflict-divider" aria-hidden="true">↔</div>
+    <div class="conflict-side">
+      <h4>Claim B</h4>
+      <p>${escapeHtml(c.claimB.statement)}</p>
+      <div class="claim-meta">
+        ${authorBadge(c.claimB.author?.kind)}
+        <span class="claim-confidence confidence-${escapeHtml(c.claimB.confidence.toLowerCase())}">${escapeHtml(c.claimB.confidence)}</span>
+      </div>
+      <code>${escapeHtml(c.claimB.sourceRef ?? 'No source')}</code>
     </div>
-    <code>${escapeHtml(c.claimB.sourceRef ?? 'No source')}</code>
   </div>
 </div>`
-            }))
+          )
           .join('')
       : '<p class="empty-section">No conflicts detected</p>';
 
@@ -153,8 +146,4 @@ export function renderContextInspector(bundle: ContextBundle, orgId?: string): s
 </div>`;
 
   return htmlPage('Context Inspector', content, orgId);
-}
-
-function escapeHtml(text: string): string {
-  return text.replace(/&/gu, '&').replace(/</gu, '<').replace(/>/gu, '>').replace(/"/gu, '"');
 }

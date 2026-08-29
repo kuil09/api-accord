@@ -1,7 +1,6 @@
 // Layout and page shell components for Web UI
 
 export function htmlPage(title: string, bodyContent: string, orgId?: string): string {
-  const orgParam = orgId ? `?organizationId=${encodeURIComponent(orgId)}` : '';
   return `<!doctype html>
 <html lang="ko">
 <head>
@@ -21,7 +20,7 @@ export function htmlPage(title: string, bodyContent: string, orgId?: string): st
 </html>`;
 }
 
-function navbar(orgId?: string): string {
+export function navbar(orgId?: string): string {
   const orgParam = orgId ? `?organizationId=${encodeURIComponent(orgId)}` : '';
   const inboxHref = `/ui/inbox?recipient=team-merchant${orgId ? `&organizationId=${encodeURIComponent(orgId)}` : ''}`;
   return `
@@ -35,13 +34,13 @@ function navbar(orgId?: string): string {
 </nav>`;
 }
 
-function footer(): string {
+export function footer(): string {
   return `
 <footer class="page-footer" role="contentinfo">
   API Accord &middot; Contract &middot; Context &middot; Decision &middot; Evidence
 </footer>`;
 }
 
-function escapeHtml(text: string): string {
+export function escapeHtml(text: string): string {
   return text.replace(/&/gu, '&').replace(/</gu, '<').replace(/>/gu, '>').replace(/"/gu, '"');
 }

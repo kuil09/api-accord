@@ -1,17 +1,15 @@
 // Proposal detail screen renderer
 
-import { htmlPage } from './layout.js';
+import { htmlPage, escapeHtml } from './layout.js';
 import {
-  sectionBox,
   card,
   renderList,
-  timeline,
   Badge,
   tabs,
   emptyState,
   phaseProgress
 } from './components.js';
-import type { DiscussionSummary } from '@api-accord/domain';
+import type { DiscussionSummary, DecisionRecord } from '@api-accord/domain';
 
 export interface ProposalData {
   readonly proposal: {
@@ -22,19 +20,10 @@ export interface ProposalData {
     readonly openBlockingObjections: number;
   };
   readonly discussion: DiscussionSummary;
-  readonly decisions: ReadonlyArray<{
-    readonly id: string;
-    readonly decision: string;
-    readonly constraints?: string;
-    readonly rejectedAlternatives?: string;
-    readonly supersededBy?: string | undefined;
-    readonly validityWindow?: { readonly from: string; readonly to?: string } | undefined;
-  }>;
+  readonly decisions: ReadonlyArray<DecisionRecord>;
 }
 
 export function renderProposalDetail(data: ProposalData, orgId?: string): string {
-  const orgParam = orgId ? `?organizationId=${encodeURIComponent(orgId)}` : '';
-
   // Discussion tabs
   const discussionTabs = tabs([
     {
@@ -79,10 +68,14 @@ export function renderProposalDetail(data: ProposalData, orgId?: string): string
             content: `
 <div class="decision-body">
   <p><strong>Decision:</strong> ${escapeHtml(d.decision)}</p>
-  ${d.constraints ? `<p><strong>Constraints:</strong> ${escapeHtml(d.constraints)}</p>` : ''}
-  ${d.rejectedAlternatives ? `<p><strong>Rejected Alternatives:</strong> ${escapeHtml(d.rejectedAlternatives)}</p>` : ''}
-  ${d.validityWindow ? `<p><strong>Validity:</strong> ${escapeHtml(d.validityWindow.from)}${d.validityWindow.to ? ` → ${escapeHtml(d.validityWindow.to)}` : ' (open-ended)'}</p>` : ''}
+  <p><strong>Rationale:</strong> ${escapeHtml(d.rationale)}</p>
+  ${d.constraints.length > 0 ? `<p><strong>Constraints:</strong> ${escapeHtml(d.constraints.join('; '))}</p>` : ''}
+  ${d.rejectedAlternatives.length > 0
+    ? `<p><strong>Rejected Alternatives:</strong></p><ul>${d.rejectedAlternatives.map((a) => `<li>${escapeHtml(a.alternative)} — ${escapeHtml(a.reason)}</li>`).join('')}</ul>`
+    : ''}
+  <p><strong>Validity:</strong> ${escapeHtml(d.validFrom.toISOString())}${d.validUntil ? ` → ${escapeHtml(d.validUntil.toISOString())}` : ' (open-ended)'}</p>
   ${d.supersededBy ? `<p><strong>Superseded by:</strong> ${escapeHtml(d.supersededBy)}</p>` : ''}
+  ${d.supersedes ? `<p><strong>Supersedes:</strong> ${escapeHtml(d.supersedes)}</p>` : ''}
 </div>`,
             badges: [d.supersededBy ? Badge.superseded() : Badge.custom('active', 'success')],
             actions: [{ label: 'View Details', href: `#`, variant: 'secondary' }]
@@ -118,8 +111,4 @@ export function renderProposalDetail(data: ProposalData, orgId?: string): string
 </div>`;
 
   return htmlPage(data.proposal.title, content, orgId);
-}
-
-function escapeHtml(text: string): string {
-  return text.replace(/&/gu, '&').replace(/</gu, '<').replace(/>/gu, '>').replace(/"/gu, '"');
 }

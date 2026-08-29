@@ -2,7 +2,6 @@ import { createLogger, errorMetadata, loadAppConfig, loadDotEnvFile, requireData
 
 import { createWebApplication } from './app.js';
 import { createPostgresEventStore, createPostgresResources } from '@api-accord/persistence';
-import { DomainService } from '@api-accord/domain';
 
 loadDotEnvFile();
 
@@ -14,7 +13,6 @@ const logger = createLogger({
 const databaseUrl = requireDatabaseUrl(config);
 const postgres = createPostgresResources(databaseUrl, { applicationName: 'api-accord-web' });
 const eventStore = createPostgresEventStore(postgres.pool);
-const domainService = new DomainService(eventStore);
 
 const application = createWebApplication({ logger, domain: { store: eventStore } });
 
