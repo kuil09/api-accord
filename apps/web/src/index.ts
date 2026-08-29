@@ -1,6 +1,8 @@
-import { createLogger, errorMetadata, loadAppConfig, loadDotEnvFile } from '@api-accord/config';
+import { createLogger, errorMetadata, loadAppConfig, loadDotEnvFile, requireDatabaseUrl } from '@api-accord/config';
 
 import { createWebApplication } from './app.js';
+import { createPostgresEventStore, createPostgresResources } from '@api-accord/persistence';
+import { DomainService } from '@api-accord/domain';
 
 loadDotEnvFile();
 
@@ -9,15 +11,15 @@ const logger = createLogger({
   service: 'web',
   minimumLevel: config.logLevel
 });
+const databaseUrl = requireDatabaseUrl(config);
+const postgres = createPostgresResources(databaseUrl, { applicationName: 'api-accord-web' });
+const eventStore = createPostgresEventStore(postgres.pool);
+const domainService = new DomainService(eventStore);
 
-// Issue #20: the web app serves domain-backed read API and screens when a
-// domain context (shared event ledger) is provided. Production wiring of the
-// PostgreSQL EventStore adapter requires a shared persistence package
-// (follow-up issue); tests inject an InMemoryEventStore over the same routes.
-const application = createWebApplication({ logger });
+const application = createWebApplication({ logger, domain: { store: eventStore } });
 
 application.server.listen(config.port, () => {
-  logger.info('web.started', { port: config.port, nodeEnv: config.nodeEnv, domainBacked: false });
+  logger.info('web.started', { port: config.port, nodeEnv: config.nodeEnv, domainBacked: true });
 });
 
 let shuttingDown = false;
@@ -31,6 +33,7 @@ async function shutdown(signal: string): Promise<void> {
 
   try {
     await application.close();
+    await postgres.pool.end();
   } catch (error) {
     logger.error('web.stop.failed', errorMetadata(error));
     process.exitCode = 1;

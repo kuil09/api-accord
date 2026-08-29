@@ -25,7 +25,8 @@
       "@api-accord/config": ["packages/config/src/index.ts"],
       "@api-accord/contracts": ["packages/contracts/src/index.ts"],
       "@api-accord/domain": ["packages/domain/src/index.ts"],
-      "@api-accord/mcp": ["packages/mcp/src/index.ts"]
+      "@api-accord/mcp": ["packages/mcp/src/index.ts"],
+      "@api-accord/persistence": ["packages/persistence/src/index.ts"]
     }
   }
 }

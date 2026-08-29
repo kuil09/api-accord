@@ -1,8 +1,7 @@
 import { createLogger, errorMetadata, loadAppConfig, loadDotEnvFile, requireDatabaseUrl } from '@api-accord/config';
 
 import { createApiApplication } from './app.js';
-import { createPostgresEventStore } from './event-store.js';
-import { createPostgresResources } from './postgres.js';
+import { createPostgresEventStore, createPostgresResources } from '@api-accord/persistence';
 import { DomainService } from '@api-accord/domain';
 
 loadDotEnvFile();
@@ -13,8 +12,8 @@ const logger = createLogger({
   minimumLevel: config.logLevel
 });
 const databaseUrl = requireDatabaseUrl(config);
-const postgres = createPostgresResources(databaseUrl);
-const eventStore = createPostgresEventStore(databaseUrl);
+const postgres = createPostgresResources(databaseUrl, { applicationName: 'api-accord-api' });
+const eventStore = createPostgresEventStore(postgres.pool);
 const domainService = new DomainService(eventStore);
 
 // Issue #13: GitHub webhook ingestion is enabled when a webhook secret is
