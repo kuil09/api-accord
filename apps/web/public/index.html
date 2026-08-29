@@ -3,43 +3,101 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="API Accord foundation workspace" />
+    <meta name="description" content="API Accord - API-centered collaboration for contracts, context, decisions, and evidence" />
     <title>API Accord</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <main>
-      <header class="hero">
-        <p class="eyebrow">API-CENTERED COLLABORATION</p>
-        <h1>API Accord</h1>
-        <p class="lead">Contract · Context · Decision · Evidence</p>
-        <p class="summary">
-          서비스 제공자와 소비자 사이에서 API 계약의 이유, 숨은 기대, 변경 합의와 구현 증거를 시간에 따라 보존한다.
-        </p>
-      </header>
+    <main class="page-shell">
+      <nav class="navbar" role="navigation" aria-label="Main navigation">
+        <a href="/ui/workspace" class="nav-brand" aria-label="API Accord Home">API Accord</a>
+        <div class="nav-links">
+          <a href="/ui/workspace">Workspace</a>
+          <a href="/ui/inbox?recipient=team-merchant">Inbox</a>
+          <a href="/">Home</a>
+        </div>
+      </nav>
+      <div class="page-content">
+        <div class="landing">
+          <header class="hero">
+            <p class="eyebrow">API-CENTERED COLLABORATION</p>
+            <h1>API Accord</h1>
+            <p class="lead">Contract · Context · Decision · Evidence</p>
+            <p class="summary">
+              서비스 제공자와 소비자 사이에서 API 계약의 이유, 숨은 기대, 변경 합의와 구현 증거를 시간에 따라 보존한다.
+            </p>
+            <div class="hero-actions">
+              <a href="/ui/workspace" class="btn btn-primary btn-lg">Open Workspace</a>
+              <a href="/ui/inbox?recipient=team-merchant" class="btn btn-secondary btn-lg">View Inbox</a>
+            </div>
+          </header>
 
-      <section class="grid" aria-label="Foundation boundaries">
-        <article>
-          <h2>계약</h2>
-          <p>스펙 파일만이 아니라 동작 의미와 호환성 정책을 관리한다.</p>
-        </article>
-        <article>
-          <h2>맥락</h2>
-          <p>모든 주장은 출처, 범위, 신뢰도와 정정 계보를 가진다.</p>
-        </article>
-        <article>
-          <h2>합의</h2>
-          <p>토론을 결정 기록과 검증 가능한 변경 제안으로 전환한다.</p>
-        </article>
-        <article>
-          <h2>증거</h2>
-          <p>코드, 테스트, 배포와 런타임 관찰을 계약 상태와 연결한다.</p>
-        </article>
-      </section>
+          <section class="grid" aria-label="Product pillars">
+            <article class="pillar">
+              <div class="pillar-icon" aria-hidden="true">📋</div>
+              <h2>Contract</h2>
+              <p>스펙 파일만이 아니라 동작 의미와 호환성 정책을 관리한다.</p>
+              <div class="pillar-tags">
+                <span class="badge badge-provider">PROVIDER</span>
+                <span class="badge badge-consumer">CONSUMER</span>
+                <span class="badge badge-info">OpenAPI 3.0/3.1</span>
+              </div>
+            </article>
+            <article class="pillar">
+              <div class="pillar-icon" aria-hidden="true">🧠</div>
+              <h2>Context</h2>
+              <p>모든 주장은 출처, 범위, 신뢰도와 정정 계보를 가진다.</p>
+              <div class="pillar-tags">
+                <span class="badge badge-human">HUMAN</span>
+                <span class="badge badge-ai">AI</span>
+                <span class="badge badge-info">7 Sections</span>
+              </div>
+            </article>
+            <article class="pillar">
+              <div class="pillar-icon" aria-hidden="true">⚖️</div>
+              <h2>Decision</h2>
+              <p>토론을 결정 기록과 검증 가능한 변경 제안으로 전환한다.</p>
+              <div class="pillar-tags">
+                <span class="badge badge-error">Blocking</span>
+                <span class="badge badge-info">Constraints</span>
+                <span class="badge badge-info">Lineage</span>
+              </div>
+            </article>
+            <article class="pillar">
+              <div class="pillar-icon" aria-hidden="true">🔬</div>
+              <h2>Evidence</h2>
+              <p>코드, 테스트, 배포와 런타임 관찰을 계약 상태와 연결한다.</p>
+              <div class="pillar-tags">
+                <span class="badge badge-success">Tests</span>
+                <span class="badge badge-info">Deploy</span>
+                <span class="badge badge-warning">Drift</span>
+              </div>
+            </article>
+          </section>
 
-      <footer>
-        Foundation baseline for issues #1 and #2. Product features begin in later issues.
-      </footer>
+          <section class="quick-start">
+            <h2>Quick Start</h2>
+            <div class="quick-start-grid">
+              <a href="/ui/workspace" class="quick-start-card">
+                <h3>Workspace</h3>
+                <p>서비스, 계약, 변경 제안을 한눈에</p>
+              </a>
+              <a href="/ui/inbox?recipient=team-merchant" class="quick-start-card">
+                <h3>Inbox</h3>
+                <p>승인, 구현, 검토 할 일 통합 관리</p>
+              </a>
+              <a href="/ui/operations/contract-payments%3Aget-payments-paymentid/context" class="quick-start-card">
+                <h3>Context Inspector</h3>
+                <p>7섹션 컨텍스트 번들 탐색</p>
+              </a>
+            </div>
+          </section>
+
+          <footer class="page-footer">
+            API Accord &middot; Contract &middot; Context &middot; Decision &middot; Evidence
+          </footer>
+        </div>
+      </div>
     </main>
   </body>
 </html>
