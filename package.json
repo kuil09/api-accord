@@ -14,7 +14,8 @@
   ],
   "scripts": {
     "bootstrap": "node scripts/bootstrap.mjs",
-    "build": "tsc -b",
+    "build": "npm run build:css && tsc -b",
+    "build:css": "postcss apps/web/src/views/styles.css -o apps/web/public/styles.css",
     "check": "npm run lint && npm run typecheck && npm run build && npm run test && npm run db:validate",
     "clean": "node scripts/clean.mjs",
     "demo:ui": "npm run build && node scripts/demo-ui.mjs",
@@ -37,6 +38,10 @@
     "pg": "8.16.3"
   },
   "devDependencies": {
-    "typescript": "5.8.3"
+    "typescript": "5.8.3",
+    "tailwindcss": "^3.4.0",
+    "postcss": "^8.4.0",
+    "postcss-cli": "^11.0.0",
+    "autoprefixer": "^10.4.0"
   }
 }
