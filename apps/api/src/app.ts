@@ -5,7 +5,10 @@ import type { HealthResponse, ReadinessResponse } from '@api-accord/contracts';
 import type { Logger } from '@api-accord/config';
 import { errorMetadata } from '@api-accord/config';
 import { correlationIdFromHeader, type DomainService, type EventStore } from '@api-accord/domain';
+import { IdentityService } from '@api-accord/domain';
 import { ingestWebhookDelivery, WebhookSignatureError } from './github.js';
+import { handleAuthRequest, type AuthConfig } from './auth.js';
+import type { SessionStore } from '@api-accord/persistence';
 
 export interface ReadinessProbe {
   readonly name: string;
@@ -16,7 +19,7 @@ export interface ApiApplicationOptions {
   readonly logger: Logger;
   readonly readinessProbe: ReadinessProbe;
   // Issue #13: when configured, POST /webhooks/github ingests signed GitHub
-  // events into evidence over the shared event store.
+  // events into evidence over the shared event ledger.
   readonly github?: {
     readonly webhookSecret: string;
     readonly store: EventStore;
@@ -24,6 +27,12 @@ export interface ApiApplicationOptions {
     // The app records processed delivery ids here so replays are acknowledged
     // without re-handling.
     readonly seenDeliveryIds: string[];
+  };
+  // Issue #53: authentication configuration
+  readonly auth?: {
+    readonly sessionStore: SessionStore;
+    readonly identityService: IdentityService;
+    readonly sessionTtlMs: number;
   };
 }
 
@@ -56,6 +65,18 @@ async function handleRequest(
   response.setHeader('x-correlation-id', correlationId);
 
   try {
+    // Issue #53: Authentication endpoints
+    if (options.auth !== undefined) {
+      const authConfig: AuthConfig = {
+        logger: options.logger,
+        sessionStore: options.auth.sessionStore,
+        identityService: options.auth.identityService,
+        sessionTtlMs: options.auth.sessionTtlMs
+      };
+      const handled = await handleAuthRequest(request, response, authConfig);
+      if (handled) return;
+    }
+
     if (options.github !== undefined && request.method === 'POST' && url.pathname === '/webhooks/github') {
       const rawBody = await readBody(request);
       const deliveryId = headerString(request.headers['x-github-delivery']) ?? '';

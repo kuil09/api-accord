@@ -206,6 +206,11 @@ export class IdentityService {
     const last = stream[stream.length - 1];
     return last?.version ?? 0;
   }
+
+  // Expose store events for authentication purposes
+  async getAllEvents(): Promise<readonly unknown[]> {
+    return this.#store.getAll();
+  }
 }
 
 function toHex(bytes: Uint8Array): string {
